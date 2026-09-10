@@ -26,7 +26,7 @@ router.get("/me", requireAuth, async (req, res) => {
       assignedPage: user.assignedPage,
     });
   } catch (err) {
-    console.error("Me error:", err);
+    console.error("Me error:", err?.message ?? err);
     return res.status(500).json({ ok: false, error: "Internal server error" });
   }
 });

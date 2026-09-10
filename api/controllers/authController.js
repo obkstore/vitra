@@ -45,7 +45,8 @@ export async function login(req, res) {
       username: user.username,
     });
   } catch (err) {
-    console.error("Login error:", err);
+    // Message only: full error objects can embed submitted field values.
+    console.error("Login error:", err?.message ?? err);
     return res.status(500).json({ ok: false, error: "Internal server error" });
   }
 }
@@ -88,7 +89,10 @@ export async function register(req, res) {
       username: user.username,
     });
   } catch (err) {
-    console.error("Register error:", err);
+    // Message only: Mongoose ValidationError objects embed the rejected
+    // field values — including the submitted password — which must never
+    // reach logs.
+    console.error("Register error:", err?.message ?? err);
     if (err?.code === 11000) {
       // Real MongoDB unique-index violation on username (race with the
       // findOne pre-check above, or pre-existing duplicate).

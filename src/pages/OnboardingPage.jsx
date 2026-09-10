@@ -299,6 +299,12 @@ export default function OnboardingPage() {
             />
           </div>
 
+          {!isAuthenticated && (
+            <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-xs leading-relaxed text-amber-800">
+              وضع الضيف: خطتك تُحفظ على هذا الجهاز فقط ولا تُرفع لحساب. سجّل الدخول لحفظها في حسابك والوصول إليها من أي جهاز.
+            </p>
+          )}
+
           <div className="mt-8 mb-6 text-center">
             <div className="mx-auto mb-3 h-12 w-12 rounded-2xl bg-gradient-to-br from-mental-100 to-brand-100 text-mental-700 inline-flex items-center justify-center shadow-sm">
               <StepIcon className="h-5 w-5" />

@@ -26,7 +26,7 @@ router.post("/", requireAuth, async (req, res) => {
 
     return res.status(200).json({ ok: true });
   } catch (err) {
-    console.error("Save plan error:", err);
+    console.error("Save plan error:", err?.message ?? err);
     return res.status(500).json({ ok: false, error: "Internal server error" });
   }
 });
@@ -40,7 +40,7 @@ router.get("/mine", requireAuth, async (req, res) => {
     }
     return res.status(200).json({ ok: true, plan: saved.plan });
   } catch (err) {
-    console.error("Load plan error:", err);
+    console.error("Load plan error:", err?.message ?? err);
     return res.status(500).json({ ok: false, error: "Internal server error" });
   }
 });
