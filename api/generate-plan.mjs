@@ -8,7 +8,7 @@ import {
 	validatePlanAgainstProfile,
 } from "../src/utils/promptBuilder.js";
 import { authenticateRequest } from "./middleware/authMiddleware.js";
-import { getCachedPlan, hashPlanRequest, setCachedPlan } from "./utils/planCache.js";
+import { getCachedPlan, hashPlanRequest, setCachedPlan, shouldPersistCache } from "./utils/planCache.js";
 
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const MAX_OUTPUT_TOKENS = 4000;
@@ -159,7 +159,10 @@ export default async function handler(req, res) {
 			return;
 		}
 
-		await setCachedPlan(cacheKey, validation.data);
+		// Guests read but never write: no MongoDB trace without a JWT.
+		if (shouldPersistCache(req)) {
+			await setCachedPlan(cacheKey, validation.data);
+		}
 		res.status(200).json({ ok: true, data: validation.data, cached: false });
 	} catch (error) {
 		const statusCode = error?.name === "AbortError"

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hashPlanRequest, stableStringify } from '../api/utils/planCache.js';
+import { hashPlanRequest, shouldPersistCache, stableStringify } from '../api/utils/planCache.js';
 import PlanCache from '../api/models/PlanCache.js';
 
 test('stableStringify ignores key order but respects values and arrays', () => {
@@ -31,4 +31,13 @@ test('PlanCache model requires key and payload (no DB needed)', async () => {
   });
 
   await new PlanCache({ key: 'abc123', payload: { ok: true } }).validate();
+});
+
+test('shouldPersistCache allows authenticated users and blocks guests (no-write policy)', () => {
+  assert.equal(shouldPersistCache({ user: { id: 'abc', username: 'user3' } }), true);
+  assert.equal(shouldPersistCache({}), false);
+  assert.equal(shouldPersistCache({ user: null }), false);
+  assert.equal(shouldPersistCache({ user: undefined }), false);
+  assert.equal(shouldPersistCache(null), false);
+  assert.equal(shouldPersistCache(undefined), false);
 });

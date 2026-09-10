@@ -58,6 +58,18 @@ export async function getCachedPlan(key) {
 }
 
 /**
+ * Guest no-write policy (privacy guarantee): only authenticated generations
+ * populate the server cache. Guests may READ it (same inputs deterministically
+ * yield their own plan, and it saves billed quota) but must never leave a
+ * MongoDB trace — they have no userId to own one.
+ * @param {{ user?: unknown }} req Request with optional authenticated identity.
+ * @returns {boolean} True only when a verified user is attached.
+ */
+export function shouldPersistCache(req) {
+  return Boolean(req?.user);
+}
+
+/**
  * Stores a validated plan under its fingerprint. Never throws — a failed
  * write must not fail an otherwise successful generation.
  * @param {string} key Fingerprint from hashPlanRequest.
