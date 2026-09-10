@@ -1,9 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import apiClient from "../services/apiClient.js";
 import {
   clearSession,
   getAssignedPage,
   getToken,
   getUsername,
+  isTokenExpired,
   login as serviceLogin,
   register as serviceRegister,
 } from "../services/authService.js";
@@ -34,10 +37,16 @@ import {
 
 /**
  * Reads the persisted session synchronously for lazy useState init.
+ * Expired tokens are purged on the spot so a stale session never counts
+ * as authenticated (server would 401 it on first use anyway).
  * @returns {AuthState} Initial auth state.
  */
 function loadInitialAuthState() {
   const token = getToken();
+  if (token && isTokenExpired(token)) {
+    clearSession();
+    return { token: null, username: null, assignedPage: null, isAuthenticated: false };
+  }
   return {
     token,
     username: getUsername(),
@@ -61,6 +70,46 @@ export function AuthProvider({ children }) {
 
   const clearAuthError = useCallback(() => {
     setAuthError(null);
+  }, []);
+
+  const logout = useCallback(() => {
+    clearSession();
+    setAuthState({
+      token: null,
+      username: null,
+      assignedPage: null,
+      isAuthenticated: false,
+    });
+    setAuthError(null);
+  }, []);
+
+  // Silent session validation on mount: a stored token can be revoked
+  // server-side (user deleted) while still unexpired. A 401 from /me means
+  // the session is dead — drop it quietly. Network failures are ignored so
+  // offline users keep their local session.
+  useEffect(() => {
+    if (!authState.isAuthenticated) return;
+    let cancelled = false;
+    apiClient
+      .get("/api/auth/me")
+      .then((response) => {
+        if (cancelled) return;
+        const username = response.data?.username;
+        const assignedPage = response.data?.assignedPage;
+        if (typeof username === "string" && username && username !== authState.username) {
+          setAuthState((prev) => ({ ...prev, username, assignedPage: assignedPage ?? prev.assignedPage }));
+        }
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+          logout();
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -111,21 +160,6 @@ export function AuthProvider({ children }) {
     } finally {
       setIsAuthLoading(false);
     }
-  }, []);
-
-  /**
-   * Clears the session and resets state (logout).
-   * @returns {void}
-   */
-  const logout = useCallback(() => {
-    clearSession();
-    setAuthState({
-      token: null,
-      username: null,
-      assignedPage: null,
-      isAuthenticated: false,
-    });
-    setAuthError(null);
   }, []);
 
   const contextValue = useMemo(

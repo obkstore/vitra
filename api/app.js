@@ -1,22 +1,55 @@
 import express from "express";
+import helmet from "helmet";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import authRoutes from "./routes/authRoutes.js";
 import planRoutes from "./routes/planRoutes.js";
 import generatePlanHandler from "./generate-plan.mjs"; // Adjust path if it's in another folder
 
 const app = express();
 
-app.use(express.json());
+// Security headers (CSP defaults would break the Vite SPA shell, so the
+// rest of helmet's headers apply; revisit contentSecurityPolicy when the
+// threat model needs inline-script lockdown).
+app.use(helmet());
+
+// 1mb comfortably covers a full 7-day plan save (/api/plans) while still
+// bounding body-parser abuse. generate-plan enforces its own tighter 64KB
+// cap inside the handler.
+app.use(express.json({ limit: "1mb" }));
+
+// Strict gate on auth: brute-force protection for login/register.
+// Conservative classroom-safe defaults (unknown concurrent load by design).
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { ok: false, error: "Too many attempts — try again later" },
+});
+
+// Generation is the expensive route (billed Gemini quota): per-minute,
+// per-IP cap (IPv6-safe via ipKeyGenerator, as the library mandates).
+// Keyed by IP only — the limiter runs before the handler, so the
+// optional-auth identity (req.user) is not attached yet by design.
+const generateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req.ip),
+  message: { ok: false, error: "Too many generations — try again in a minute" },
+});
 
 app.get("/api/health", (_req, res) => {
   res.status(200).json({ ok: true });
 });
 
 // POST /api/auth/login (+ POST /api/auth/register helper)
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authLimiter, authRoutes);
 
 // Per-user plan store (requireAuth + token-derived owner inside planRoutes)
 app.use("/api/plans", planRoutes);
 
-app.post("/api/generate-plan", generatePlanHandler);
+app.post("/api/generate-plan", generateLimiter, generatePlanHandler);
 
 export default app;

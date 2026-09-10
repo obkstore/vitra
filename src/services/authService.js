@@ -110,12 +110,30 @@ export function clearSession() {
 }
 
 /**
- * Whether a token is present (logged in).
- * Token expiry is checked later in AuthContext (Step 2).
- * @returns {boolean} True when a token exists.
+ * Checks whether a JWT is already expired (client-side clock).
+ * Signature is NOT verified here — the server remains the authority.
+ * @param {unknown} token JWT string.
+ * @returns {boolean} True when missing, malformed, or past `exp`.
+ */
+export function isTokenExpired(token) {
+  if (typeof token !== "string" || !token) return true;
+  try {
+    const [, payload] = token.split(".");
+    const { exp } = JSON.parse(atob(payload));
+    return typeof exp !== "number" || exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Whether a usable session exists: token present AND unexpired.
+ * An expired token is treated as logged out (server would 401 it anyway).
+ * @returns {boolean} True when logged in with a fresh token.
  */
 export function isAuthenticated() {
-  return Boolean(getToken());
+  const token = getToken();
+  return Boolean(token) && !isTokenExpired(token);
 }
 
 /**
@@ -335,6 +353,7 @@ export const authService = {
   saveSession,
   clearSession,
   isAuthenticated,
+  isTokenExpired,
   authHeaders,
   getAuthHeader,
 };
