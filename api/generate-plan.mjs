@@ -8,6 +8,7 @@ import {
 	validatePlanAgainstProfile,
 } from "../src/utils/promptBuilder.js";
 import { authenticateRequest } from "./middleware/authMiddleware.js";
+import { getCachedPlan, hashPlanRequest, setCachedPlan } from "./utils/planCache.js";
 
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const MAX_OUTPUT_TOKENS = 4000;
@@ -134,6 +135,16 @@ export default async function handler(req, res) {
 		return;
 	}
 
+	// Fingerprinted cache (P1): identical inputs deterministically yield the
+	// requester's own plan, so a hit skips the billed Gemini call entirely.
+	// Fail-open by design — lookup/write failures fall through to generation.
+	const cacheKey = hashPlanRequest({ userProfile, nutritionSummary, model: config.model });
+	const cached = await getCachedPlan(cacheKey);
+	if (cached) {
+		res.status(200).json({ ok: true, data: cached, cached: true });
+		return;
+	}
+
 	try {
 		const content = await callProvider(config, buildSystemPrompt(), buildUserPrompt(userProfile, nutritionSummary));
 		const validation = validateAIResponse(content);
@@ -148,7 +159,8 @@ export default async function handler(req, res) {
 			return;
 		}
 
-		res.status(200).json({ ok: true, data: validation.data });
+		await setCachedPlan(cacheKey, validation.data);
+		res.status(200).json({ ok: true, data: validation.data, cached: false });
 	} catch (error) {
 		const statusCode = error?.name === "AbortError"
 			? 504
