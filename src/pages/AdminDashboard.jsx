@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Inbox, RefreshCw } from "lucide-react";
+import { Inbox, MessageCircle, RefreshCw } from "lucide-react";
 import PageWrapper from "../components/layout/PageWrapper.jsx";
 import Button from "../components/ui/Button.jsx";
 import Card from "../components/ui/Card.jsx";
@@ -13,7 +13,9 @@ import {
   ORDERED_STATUSES,
   STATUS_META,
   formatRequestDate,
+  getRequestPhone,
   getRequesterName,
+  getWhatsAppLink,
 } from "../features/consultation/consultationStatus.js";
 
 const PAGE_LIMIT = 20;
@@ -163,6 +165,7 @@ export default function AdminDashboard() {
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50 text-xs text-slate-500">
                     <th scope="col" className="px-4 py-3 font-semibold">البريد</th>
+                    <th scope="col" className="px-4 py-3 font-semibold">الهاتف / واتساب</th>
                     <th scope="col" className="px-4 py-3 font-semibold">المستخدم</th>
                     <th scope="col" className="px-4 py-3 font-semibold">الرسالة</th>
                     <th scope="col" className="px-4 py-3 font-semibold">التاريخ</th>
@@ -174,10 +177,28 @@ export default function AdminDashboard() {
                   {requests.map((request) => {
                     const meta = STATUS_META[request.status];
                     const isUpdating = updatingId === request._id;
+                    const whatsAppLink = getWhatsAppLink(request);
                     return (
                       <tr key={request._id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
                         <td dir="ltr" className="max-w-[11rem] px-4 py-3 text-left align-top text-slate-700 break-all">
                           {request.email}
+                        </td>
+                        <td dir="ltr" className="px-4 py-3 text-left align-top whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5 text-slate-700">
+                            {getRequestPhone(request)}
+                            {whatsAppLink && (
+                              <a
+                                href={whatsAppLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label={`مراسلة ${request.email} واتساب`}
+                                title="مراسلة واتساب"
+                                className="inline-flex items-center justify-center rounded-lg bg-brand-100 p-1.5 text-brand-800 transition-colors hover:bg-brand-200"
+                              >
+                                <MessageCircle className="h-4 w-4" />
+                              </a>
+                            )}
+                          </span>
                         </td>
                         <td className="px-4 py-3 align-top font-semibold text-slate-800">
                           {getRequesterName(request)}
@@ -223,6 +244,7 @@ export default function AdminDashboard() {
                 const meta = STATUS_META[request.status];
                 const isUpdating = updatingId === request._id;
                 const isExpanded = expandedId === request._id;
+                const whatsAppLink = getWhatsAppLink(request);
                 return (
                   <Card key={request._id} className="border border-slate-100 bg-white shadow-soft">
                     <div className="flex items-center justify-between gap-2">
@@ -237,6 +259,21 @@ export default function AdminDashboard() {
                       {request.email}
                     </p>
                     <p className="mt-0.5 text-xs text-slate-500">من: {getRequesterName(request)}</p>
+                    <p dir="ltr" className="mt-1.5 flex items-center gap-1.5 text-left text-sm text-slate-700">
+                      <span>{getRequestPhone(request)}</span>
+                      {whatsAppLink && (
+                        <a
+                          href={whatsAppLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`مراسلة ${request.email} واتساب`}
+                          title="مراسلة واتساب"
+                          className="inline-flex items-center justify-center rounded-lg bg-brand-100 p-1.5 text-brand-800 transition-colors hover:bg-brand-200"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </a>
+                      )}
+                    </p>
                     <p className={`mt-2 text-sm leading-relaxed text-slate-600 ${isExpanded ? "" : "line-clamp-3"}`}>
                       {request.message}
                     </p>

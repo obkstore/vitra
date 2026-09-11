@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
-import { Mail, SendHorizontal } from "lucide-react";
+import { Mail, MessageCircle, SendHorizontal } from "lucide-react";
 import Card from "../../components/ui/Card.jsx";
 import Input from "../../components/ui/Input.jsx";
 import Button from "../../components/ui/Button.jsx";
@@ -10,9 +10,10 @@ import { consultationSchema } from "./consultationSchema.js";
 
 /**
  * Consultation request form for logged-in users.
- * Email is fully editable (no account email exists on the User model to
- * prefill from); the message is the user's health or diet question.
- * Submit calls POST /api/consultation with loading + toast feedback.
+ * Email and WhatsApp number are fully editable (no account contact details
+ * exist on the User model to prefill from); the message is the user's
+ * health or diet question. Submit calls POST /api/consultation with
+ * loading + toast feedback.
  *
  * @returns {JSX.Element}
  */
@@ -24,23 +25,24 @@ export default function ConsultationForm() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(consultationSchema),
-    defaultValues: { email: "", message: "" },
+    defaultValues: { email: "", phone: "", message: "" },
     mode: "onTouched",
   });
 
   /**
-   * Submits email + message; owner comes from the verified JWT server-side.
-   * On success the email is kept and only the message clears, so follow-up
-   * questions don't require retyping the address.
+   * Submits email + phone + message; owner comes from the verified JWT
+   * server-side. On success the contacts are kept and only the message
+   * clears, so follow-up questions don't require retyping them.
    */
   async function onSubmit(data) {
     try {
       await submitConsultationRequest({
         email: data.email.trim(),
+        phone: data.phone.trim(),
         message: data.message.trim(),
       });
       toast.success("تم إرسال طلبك بنجاح. سنرد عليك قريباً.");
-      reset({ email: data.email, message: "" });
+      reset({ email: data.email, phone: data.phone, message: "" });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر إرسال الطلب. حاول مجدداً.");
     }
@@ -53,7 +55,7 @@ export default function ConsultationForm() {
       </Card.Header>
       <Card.Body>
         <p className="mb-4 text-sm leading-relaxed text-slate-500">
-          أرسل سؤالك الصحي أو الغذائي وسيرد عليك المشرف أو المدرّب على بريدك الإلكتروني.
+          أرسل سؤالك الصحي أو الغذائي وسيتواصل معك المشرف أو المدرّب عبر بريدك الإلكتروني أو واتساب.
         </p>
         <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
           <Input
@@ -65,6 +67,17 @@ export default function ConsultationForm() {
             leftIcon={<Mail className="h-4 w-4" />}
             error={errors.email?.message}
             {...register("email")}
+          />
+          <Input
+            label="رقم الهاتف / واتساب"
+            type="tel"
+            autoComplete="tel"
+            dir="ltr"
+            placeholder="+201012345678"
+            hint="الصيغة الدولية مع + ليتواصل معك المدرّب واتساب."
+            leftIcon={<MessageCircle className="h-4 w-4" />}
+            error={errors.phone?.message}
+            {...register("phone")}
           />
           <div className="w-full">
             <label htmlFor="consultation-message" className="mb-1.5 block text-sm font-medium text-slate-700">

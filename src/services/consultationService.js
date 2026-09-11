@@ -47,19 +47,20 @@ function normalizeConsultationError(error, fallback) {
 
 /**
  * Submits a consultation request for the logged-in user.
- * @param {{ email: string, message: string }} data Contact email + health message.
+ * @param {{ email: string, phone: string, message: string }} data Contact email + WhatsApp number + health message.
  * @returns {Promise<object>} Created request document.
  */
 export async function submitConsultationRequest(data) {
   const email = String(data?.email ?? "").trim();
+  const phone = String(data?.phone ?? "").trim();
   const message = String(data?.message ?? "").trim();
 
-  if (!email || !message) {
-    throw new Error("يرجى إدخال البريد الإلكتروني ورسالتك.");
+  if (!email || !phone || !message) {
+    throw new Error("يرجى إدخال البريد الإلكتروني ورقم الهاتف ورسالتك.");
   }
 
   try {
-    const response = await apiClient.post("/api/consultation", { email, message });
+    const response = await apiClient.post("/api/consultation", { email, phone, message });
     if (response.data?.ok !== true || !response.data?.request) {
       throw new Error(response.data?.error ?? "تعذر إرسال الطلب. حاول مجدداً.");
     }

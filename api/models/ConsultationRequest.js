@@ -23,6 +23,16 @@ const consultationRequestSchema = new mongoose.Schema(
       lowercase: true,
       match: [/^\S+@\S+\.\S+$/, "valid email is required"],
     },
+    phone: {
+      type: String,
+      required: [true, "phone is required"],
+      trim: true,
+      // Strict E.164: mandatory `+`, 8–15 digits, no spaces or dashes, so
+      // stored numbers are always ready for wa.me deep links. Pre-phone
+      // documents already in the DB are unaffected: `required` enforces on
+      // create, and update validators only check the patched paths.
+      match: [/^\+[1-9]\d{7,14}$/, "phone must be in international format like +201012345678"],
+    },
     message: {
       type: String,
       required: [true, "message is required"],

@@ -50,3 +50,31 @@ export function getRequesterName(request) {
   }
   return "—";
 }
+
+/**
+ * Resolves the requester's phone number, tolerating older documents saved
+ * before the phone field existed.
+ * @param {object} request Request document.
+ * @returns {string} Trimmed phone number or a dash when not provided.
+ */
+export function getRequestPhone(request) {
+  const phone = request?.phone;
+  if (typeof phone === "string" && phone.trim()) {
+    return phone.trim();
+  }
+  return "—";
+}
+
+/**
+ * Builds a click-to-chat WhatsApp link for a request.
+ * @param {object} request Request document.
+ * @returns {string|null} wa.me URL, or null when no usable phone exists
+ * (older phone-less rows render no button instead of a broken link).
+ */
+export function getWhatsAppLink(request) {
+  const phone = request?.phone;
+  if (typeof phone !== "string") return null;
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 8 || digits.length > 15) return null;
+  return `https://wa.me/${digits}`;
+}
