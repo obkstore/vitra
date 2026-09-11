@@ -16,6 +16,10 @@ function signToken(user) {
 /**
  * POST /login
  * Verifies credentials and returns a JWT plus the user's assignedPage.
+ * Self-heals stale pages: an admin promoted via manual DB update keeps
+ * their old `/dashboard/<username>` page until fixed — so when the stored
+ * role is admin but assignedPage isn't `/admin/home`, the corrected value
+ * is persisted before responding and the next login lands correctly.
  */
 export async function login(req, res) {
   try {
@@ -34,6 +38,11 @@ export async function login(req, res) {
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ ok: false, error: "Invalid credentials" });
+    }
+
+    if (user.role === "admin" && user.assignedPage !== "/admin/home") {
+      user.assignedPage = "/admin/home";
+      await user.save();
     }
 
     const token = signToken(user);
