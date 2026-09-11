@@ -12,6 +12,7 @@ const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const AdminHomePage = lazy(() => import("./pages/AdminHomePage"));
 
 function LoadingFallback() {
 	return (
@@ -72,6 +73,15 @@ function App() {
 					element={
 						<RequireAdmin>
 							<AdminDashboard />
+						</RequireAdmin>
+					}
+				/>
+				{/* Admin landing page (no assignedPage changes yet — visit manually). */}
+				<Route
+					path="/admin/home"
+					element={
+						<RequireAdmin>
+							<AdminHomePage />
 						</RequireAdmin>
 					}
 				/>
