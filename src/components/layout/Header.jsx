@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Moon, Sun, House } from 'lucide-react';
+import { Moon, Sun, House, ShieldCheck } from 'lucide-react';
 import usePlan from '../../context/PlanContext';
 import { useAuth } from '../../context/AuthContext';
 import { useUserProfile } from '../../context/UserProfileContext';
@@ -19,7 +19,7 @@ export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
   const { hasGenerated, resetPlan } = usePlan();
-  const { isAuthenticated, username, logout } = useAuth();
+  const { isAuthenticated, isAdmin, username, logout } = useAuth();
   const { resetProfile } = useUserProfile();
   const { resetStepper } = useStepper();
   const [isScrolled, setIsScrolled] = useState(false);
@@ -136,6 +136,16 @@ export default function Header() {
               <span className={clsx('hidden text-xs sm:inline-flex rounded-full px-3 py-1 font-semibold max-w-32 truncate', isLandingPage || isDark ? 'bg-white/10 text-slate-200' : 'bg-slate-100 text-slate-600')}>
                 {username}
               </span>
+              {isAdmin ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<ShieldCheck className="h-4 w-4" />}
+                  onClick={() => navigate('/admin')}
+                >
+                  لوحة المشرف
+                </Button>
+              ) : null}
               <Button variant="ghost" size="sm" onClick={handleLogout}>
                 تسجيل الخروج
               </Button>

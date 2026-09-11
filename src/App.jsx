@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import usePlan from "./context/PlanContext";
 import { useAuth } from "./context/AuthContext";
 import RequireAuth from "./components/auth/RequireAuth";
+import RequireAdmin from "./components/auth/RequireAdmin";
 
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
@@ -10,6 +11,7 @@ const ResultsPage = lazy(() => import("./pages/ResultsPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 
 function LoadingFallback() {
 	return (
@@ -56,14 +58,23 @@ function App() {
 						}
 					/>
 					<Route path="/onboarding" element={<OnboardingPage />} />
-					<Route
-						path="/results"
-						element={
-							<ProtectedResultsRoute>
-								<ResultsPage />
-							</ProtectedResultsRoute>
-						}
-					/>
+				<Route
+					path="/results"
+					element={
+						<ProtectedResultsRoute>
+							<ResultsPage />
+						</ProtectedResultsRoute>
+					}
+				/>
+				{/* Admin-only consultation request management. */}
+				<Route
+					path="/admin"
+					element={
+						<RequireAdmin>
+							<AdminDashboard />
+						</RequireAdmin>
+					}
+				/>
 					<Route path="/404" element={<NotFoundPage />} />
 					<Route path="*" element={<Navigate to="/404" replace />} />
 				</Routes>

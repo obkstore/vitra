@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import apiClient from "../services/apiClient.js";
 import {
@@ -10,6 +10,7 @@ import {
   isTokenExpired,
   login as serviceLogin,
   register as serviceRegister,
+  saveSession,
 } from "../services/authService.js";
 
 /**
@@ -18,6 +19,7 @@ import {
  * @property {(string|null)} token Stored JWT.
  * @property {(string|null)} username Stored username.
  * @property {(string|null)} assignedPage User's own diet-plan route.
+ * @property {(string|null)} role User role ("user" | "admin").
  * @property {boolean} isAuthenticated Whether a token is present.
  */
 
@@ -27,6 +29,8 @@ import {
  * @property {(string|null)} token Stored JWT.
  * @property {(string|null)} username Stored username.
  * @property {(string|null)} assignedPage User's own diet-plan route.
+ * @property {string} role User role ("user" | "admin", defaults to "user").
+ * @property {boolean} isAdmin True when the user has the admin role.
  * @property {boolean} isAuthenticated Whether a token is present.
  * @property {boolean} isAuthLoading True while login/register is in flight.
  * @property {(string|null)} authError Last Arabic auth error message.
@@ -70,6 +74,12 @@ export function AuthProvider({ children }) {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
 
+  // Latest state for the one-shot /me reconciliation below, so the response
+  // is compared against current values (not the mount-time closure) when a
+  // login/logout happens while the request is in flight.
+  const authStateRef = useRef(authState);
+  authStateRef.current = authState;
+
   const clearAuthError = useCallback(() => {
     setAuthError(null);
   }, []);
@@ -90,6 +100,10 @@ export function AuthProvider({ children }) {
   // server-side (user deleted) while still unexpired. A 401 from /me means
   // the session is dead — drop it quietly. Network failures are ignored so
   // offline users keep their local session.
+  // A 200 also reconciles username/assignedPage/role (e.g. a promotion to
+  // admin applies without forcing re-login). Identity, storage, and state
+  // update together in one place: saveSession is the single localStorage
+  // write path, followed by a single setAuthState.
   useEffect(() => {
     if (!authState.isAuthenticated) return;
     let cancelled = false;
@@ -97,15 +111,29 @@ export function AuthProvider({ children }) {
       .get("/api/auth/me")
       .then((response) => {
         if (cancelled) return;
+        const prev = authStateRef.current;
         const username = response.data?.username;
         const assignedPage = response.data?.assignedPage;
         const role = response.data?.role;
-        if (typeof username === "string" && username && username !== authState.username) {
-          setAuthState((prev) => ({ ...prev, username, assignedPage: assignedPage ?? prev.assignedPage }));
-        }
-        if (typeof role === "string" && role && role !== authState.role) {
-          setAuthState((prev) => ({ ...prev, role }));
-        }
+        const next = {
+          ...prev,
+          username: typeof username === "string" && username ? username : prev.username,
+          assignedPage:
+            typeof assignedPage === "string" && assignedPage ? assignedPage : prev.assignedPage,
+          role: typeof role === "string" && role ? role : prev.role,
+        };
+        const changed =
+          next.username !== prev.username ||
+          next.assignedPage !== prev.assignedPage ||
+          next.role !== prev.role;
+        if (!changed) return;
+        saveSession({
+          token: next.token,
+          username: next.username,
+          assignedPage: next.assignedPage,
+          role: next.role,
+        });
+        setAuthState(next);
       })
       .catch((error) => {
         if (cancelled) return;
@@ -122,7 +150,7 @@ export function AuthProvider({ children }) {
   /**
    * Logs in and syncs context state with the persisted session.
    * @param {{ username: string, password: string }} credentials Credentials.
-   * @returns {Promise<{ token: string, username: string, assignedPage: string }>} Session.
+   * @returns {Promise<{ token: string, username: string, assignedPage: string, role: string }>} Session.
    */
   const login = useCallback(async (credentials) => {
     setIsAuthLoading(true);
@@ -148,7 +176,7 @@ export function AuthProvider({ children }) {
   /**
    * Registers a new user and syncs context state with the persisted session.
    * @param {{ username: string, password: string }} data Registration data.
-   * @returns {Promise<{ token: string, username: string, assignedPage: string }>} Session.
+   * @returns {Promise<{ token: string, username: string, assignedPage: string, role: string }>} Session.
    */
   const register = useCallback(async (data) => {
     setIsAuthLoading(true);
