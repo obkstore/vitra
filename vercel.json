@@ -9,6 +9,12 @@
     },
     "api/plans/[...path].js": {
       "maxDuration": 15
+    },
+    "api/consultation/[...path].js": {
+      "maxDuration": 15
+    },
+    "api/admin/[...path].js": {
+      "maxDuration": 15
     }
   },
   "rewrites": [

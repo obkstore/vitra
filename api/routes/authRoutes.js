@@ -24,6 +24,7 @@ router.get("/me", requireAuth, async (req, res) => {
       ok: true,
       username: user.username,
       assignedPage: user.assignedPage,
+      role: user.role ?? "user",
     });
   } catch (err) {
     console.error("Me error:", err?.message ?? err);

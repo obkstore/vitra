@@ -7,7 +7,7 @@ function signToken(user) {
     throw new Error("JWT_SECRET is not defined. Set it in your .env file.");
   }
   return jwt.sign(
-    { id: user._id.toString(), username: user.username },
+    { id: user._id.toString(), username: user.username, role: user.role ?? "user" },
     secret,
     { expiresIn: process.env.JWT_EXPIRES_IN ?? "1d" },
   );
@@ -43,6 +43,7 @@ export async function login(req, res) {
       token,
       assignedPage: user.assignedPage,
       username: user.username,
+      role: user.role ?? "user",
     });
   } catch (err) {
     // Message only: full error objects can embed submitted field values.
@@ -79,6 +80,10 @@ export async function register(req, res) {
       return res.status(409).json({ ok: false, error: "username already exists" });
     }
 
+    // NOTE: `role` is intentionally never read from req.body. Every
+    // self-registration creates a plain "user"; admins are promoted via a
+    // one-off DB update (see DEPLOY/admin bootstrap notes). Accepting a
+    // client-supplied role would allow privilege escalation.
     const user = await User.create({ username, password, assignedPage });
     const token = signToken(user);
 
@@ -87,6 +92,7 @@ export async function register(req, res) {
       token,
       assignedPage: user.assignedPage,
       username: user.username,
+      role: user.role ?? "user",
     });
   } catch (err) {
     // Message only: Mongoose ValidationError objects embed the rejected

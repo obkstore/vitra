@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import User from "../models/User.js";
 
 /**
  * Verifies the Bearer JWT on a request without depending on Express.
@@ -6,7 +7,7 @@ import jwt from "jsonwebtoken";
  * server.js) AND direct Vercel function invocations (which bypass app.js,
  * so Express-chain middleware silently never runs there).
  * @param {{ headers?: Record<string, unknown> }} req Request with headers.
- * @returns {{ id: string, username: string } | null} Token payload or null.
+ * @returns {{ id: string, username: string, role?: string } | null} Token payload or null.
  */
 export function authenticateRequest(req) {
   const header = req?.headers?.authorization ?? "";
@@ -53,7 +54,7 @@ export function isOwner(reqUser, routeUsername) {
 
 /**
  * Express middleware that verifies the Bearer JWT set by POST /login.
- * On success attaches `req.user = { id, username }`.
+ * On success attaches `req.user = { id, username, role }`.
  */
 export function requireAuth(req, res, next) {
   const user = authenticateRequest(req);
@@ -68,6 +69,36 @@ export function requireAuth(req, res, next) {
 
   req.user = user;
   return next();
+}
+
+/**
+ * Admin-only guard. MUST be chained after `requireAuth`:
+ *   router.get("/requests", requireAuth, requireAdmin, handler)
+ *
+ * JWT + DB re-check: the token role is a fast-path hint, but the database
+ * is the source of truth so demotions take effect without forcing re-login.
+ * Returns 401 when unauthenticated, 403 when authenticated but not admin.
+ */
+export async function requireAdmin(req, res, next) {
+  if (!req.user?.id) {
+    return res.status(401).json({ ok: false, error: "Missing or malformed Authorization header" });
+  }
+
+  try {
+    const dbUser = await User.findById(req.user.id).select("role");
+    if (!dbUser) {
+      return res.status(401).json({ ok: false, error: "Invalid credentials" });
+    }
+    if (dbUser.role !== "admin") {
+      return res.status(403).json({ ok: false, error: "Forbidden: admin access required" });
+    }
+    // Refresh role from DB so downstream handlers see the current value.
+    req.user.role = dbUser.role;
+    return next();
+  } catch (err) {
+    console.error("[auth] requireAdmin lookup failed:", err?.message ?? err);
+    return res.status(500).json({ ok: false, error: "Internal server error" });
+  }
 }
 
 export default requireAuth;

@@ -34,6 +34,12 @@ const userSchema = new mongoose.Schema(
       trim: true,
       match: [/^\/[A-Za-z0-9/_-]*$/, "assignedPage must be a route like '/dashboard/user1'"],
     },
+    role: {
+      type: String,
+      enum: ["user", "admin"],
+      default: "user",
+      index: true,
+    },
   },
   { timestamps: true },
 );

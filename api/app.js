@@ -3,6 +3,8 @@ import helmet from "helmet";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import authRoutes from "./routes/authRoutes.js";
 import planRoutes from "./routes/planRoutes.js";
+import consultationRoutes from "./routes/consultationRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 import generatePlanHandler from "./generate-plan.mjs"; // Adjust path if it's in another folder
 
 const app = express();
@@ -40,6 +42,16 @@ const generateLimiter = rateLimit({
   message: { ok: false, error: "Too many generations — try again in a minute" },
 });
 
+// Consultation submissions are authenticated writes: per-minute, per-IP cap
+// against spam while staying generous for legitimate use.
+const consultationLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { ok: false, error: "Too many requests — try again in a minute" },
+});
+
 app.get("/api/health", (_req, res) => {
   res.status(200).json({ ok: true });
 });
@@ -49,6 +61,12 @@ app.use("/api/auth", authLimiter, authRoutes);
 
 // Per-user plan store (requireAuth + token-derived owner inside planRoutes)
 app.use("/api/plans", planRoutes);
+
+// Consultation requests (POST requires login; owner from JWT)
+app.use("/api/consultation", consultationLimiter, consultationRoutes);
+
+// Admin-only request management (requireAuth + requireAdmin inside adminRoutes)
+app.use("/api/admin", adminRoutes);
 
 app.post("/api/generate-plan", generateLimiter, generatePlanHandler);
 

@@ -11,6 +11,7 @@ import axios from "axios";
 export const TOKEN_KEY = "vitra_token";
 export const USERNAME_KEY = "vitra_username";
 export const ASSIGNED_PAGE_KEY = "vitra_assigned_page";
+export const ROLE_KEY = "vitra_role";
 
 const LOGIN_URL = "/api/auth/login";
 const REGISTER_URL = "/api/auth/register";
@@ -88,15 +89,24 @@ export function getAssignedPage() {
 }
 
 /**
+ * Reads the stored role ("user" | "admin").
+ * @returns {string|null} Role or null when logged out.
+ */
+export function getRole() {
+  return safeGet(ROLE_KEY);
+}
+
+/**
  * Persists a login/register session. Only truthy values are stored.
- * @param {{ token?: unknown, username?: unknown, assignedPage?: unknown }} session Session payload.
+ * @param {{ token?: unknown, username?: unknown, assignedPage?: unknown, role?: unknown }} session Session payload.
  * @returns {void}
  */
 export function saveSession(session) {
-  const { token, username, assignedPage } = session ?? {};
+  const { token, username, assignedPage, role } = session ?? {};
   if (typeof token === "string" && token) safeSet(TOKEN_KEY, token);
   if (typeof username === "string" && username) safeSet(USERNAME_KEY, username);
   if (typeof assignedPage === "string" && assignedPage) safeSet(ASSIGNED_PAGE_KEY, assignedPage);
+  if (typeof role === "string" && role) safeSet(ROLE_KEY, role);
 }
 
 /**
@@ -107,6 +117,7 @@ export function clearSession() {
   safeRemove(TOKEN_KEY);
   safeRemove(USERNAME_KEY);
   safeRemove(ASSIGNED_PAGE_KEY);
+  safeRemove(ROLE_KEY);
 }
 
 /**
@@ -267,11 +278,11 @@ function normalizeAuthError(error, mode) {
  * Handles a successful auth payload: validates, persists, returns session.
  * @param {unknown} payload Response body.
  * @param {"login"|"register"} mode Which endpoint was called.
- * @returns {{ token: string, username: string, assignedPage: string }} Persisted session.
+ * @returns {{ token: string, username: string, assignedPage: string, role: string }} Persisted session.
  */
 function handleAuthPayload(payload, mode) {
   const fallback = mode === "register" ? FALLBACK_REGISTER_MESSAGE : FALLBACK_LOGIN_MESSAGE;
-  const data = /** @type {{ ok?: boolean, token?: unknown, username?: unknown, assignedPage?: unknown, error?: unknown }} */ (
+  const data = /** @type {{ ok?: boolean, token?: unknown, username?: unknown, assignedPage?: unknown, role?: unknown, error?: unknown }} */ (
     payload ?? {}
   );
 
@@ -284,6 +295,7 @@ function handleAuthPayload(payload, mode) {
     token: data.token,
     username: typeof data.username === "string" ? data.username : "",
     assignedPage: typeof data.assignedPage === "string" ? data.assignedPage : "",
+    role: typeof data.role === "string" && data.role ? data.role : "user",
   };
 
   saveSession(session);
@@ -350,6 +362,7 @@ export const authService = {
   getToken,
   getUsername,
   getAssignedPage,
+  getRole,
   saveSession,
   clearSession,
   isAuthenticated,

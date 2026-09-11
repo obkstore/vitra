@@ -4,6 +4,7 @@ import apiClient from "../services/apiClient.js";
 import {
   clearSession,
   getAssignedPage,
+  getRole,
   getToken,
   getUsername,
   isTokenExpired,
@@ -45,12 +46,13 @@ function loadInitialAuthState() {
   const token = getToken();
   if (token && isTokenExpired(token)) {
     clearSession();
-    return { token: null, username: null, assignedPage: null, isAuthenticated: false };
+    return { token: null, username: null, assignedPage: null, role: null, isAuthenticated: false };
   }
   return {
     token,
     username: getUsername(),
     assignedPage: getAssignedPage(),
+    role: getRole() ?? "user",
     isAuthenticated: Boolean(token),
   };
 }
@@ -78,6 +80,7 @@ export function AuthProvider({ children }) {
       token: null,
       username: null,
       assignedPage: null,
+      role: null,
       isAuthenticated: false,
     });
     setAuthError(null);
@@ -96,8 +99,12 @@ export function AuthProvider({ children }) {
         if (cancelled) return;
         const username = response.data?.username;
         const assignedPage = response.data?.assignedPage;
+        const role = response.data?.role;
         if (typeof username === "string" && username && username !== authState.username) {
           setAuthState((prev) => ({ ...prev, username, assignedPage: assignedPage ?? prev.assignedPage }));
+        }
+        if (typeof role === "string" && role && role !== authState.role) {
+          setAuthState((prev) => ({ ...prev, role }));
         }
       })
       .catch((error) => {
@@ -126,6 +133,7 @@ export function AuthProvider({ children }) {
         token: session.token,
         username: session.username,
         assignedPage: session.assignedPage,
+        role: session.role ?? "user",
         isAuthenticated: true,
       });
       return session;
@@ -151,6 +159,7 @@ export function AuthProvider({ children }) {
         token: session.token,
         username: session.username,
         assignedPage: session.assignedPage,
+        role: session.role ?? "user",
         isAuthenticated: true,
       });
       return session;
@@ -167,6 +176,8 @@ export function AuthProvider({ children }) {
       token: authState.token,
       username: authState.username,
       assignedPage: authState.assignedPage,
+      role: authState.role ?? "user",
+      isAdmin: authState.role === "admin",
       isAuthenticated: authState.isAuthenticated,
       isAuthLoading,
       authError,
