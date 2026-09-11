@@ -1,5 +1,4 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { ShieldCheck } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import PageWrapper from "../components/layout/PageWrapper";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -15,7 +14,7 @@ import ConsultationForm from "../features/consultation/ConsultationForm";
 export default function DashboardPage() {
 	const { username: routeUsername } = useParams();
 	const navigate = useNavigate();
-	const { username: authUsername, isAdmin, logout } = useAuth();
+	const { username: authUsername, logout } = useAuth();
 	const displayName = routeUsername ?? authUsername ?? "";
 
 	function handleLogout() {
@@ -40,15 +39,6 @@ export default function DashboardPage() {
 						<Button variant="secondary" onClick={() => navigate("/results")}>
 							عرض النتائج
 						</Button>
-						{isAdmin && (
-							<Link
-								to="/admin"
-								className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-mental-400 px-5 py-2.5 text-sm font-semibold text-mental-700 transition-colors hover:bg-mental-50"
-							>
-								<ShieldCheck className="h-4 w-4" />
-								لوحة المشرف
-							</Link>
-						)}
 						<Button variant="ghost" onClick={handleLogout}>
 							تسجيل الخروج
 						</Button>
