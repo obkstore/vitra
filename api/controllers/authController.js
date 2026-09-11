@@ -54,9 +54,10 @@ export async function login(req, res) {
 
 /**
  * POST /register (helper for creating users; password is hashed by the model).
- * assignedPage is derived server-side as `/dashboard/<username>` so a
- * client can never create a mismatched user (page belonging to someone
- * else) — the exact class of bug that froze the dashboard on a blank page.
+ * assignedPage is derived server-side and role-aware: regular users get
+ * `/dashboard/<username>`, admins get `/admin/home` — so a client can never
+ * create a mismatched user (page belonging to someone else) — the exact
+ * class of bug that froze the dashboard on a blank page.
  */
 export async function register(req, res) {
   try {
@@ -73,18 +74,21 @@ export async function register(req, res) {
         .json({ ok: false, error: "username and password are required" });
     }
 
-    const assignedPage = `/dashboard/${username}`;
+    // NOTE: `role` is intentionally never read from req.body. Every
+    // self-registration creates a plain "user"; admins are promoted via a
+    // one-off DB update (see DEPLOY/admin bootstrap notes). Accepting a
+    // client-supplied role would allow privilege escalation.
+    // The admin branch below doesn't trigger for new signups yet — it
+    // prepares for admin creation flows (step 5).
+    const role = "user";
+    const assignedPage = role === "admin" ? "/admin/home" : `/dashboard/${username}`;
 
     const existing = await User.findOne({ username });
     if (existing) {
       return res.status(409).json({ ok: false, error: "username already exists" });
     }
 
-    // NOTE: `role` is intentionally never read from req.body. Every
-    // self-registration creates a plain "user"; admins are promoted via a
-    // one-off DB update (see DEPLOY/admin bootstrap notes). Accepting a
-    // client-supplied role would allow privilege escalation.
-    const user = await User.create({ username, password, assignedPage });
+    const user = await User.create({ username, password, assignedPage, role });
     const token = signToken(user);
 
     return res.status(201).json({
