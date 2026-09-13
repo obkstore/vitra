@@ -15,7 +15,7 @@ import apiClient from "./apiClient.js";
  */
 export async function savePlanToServer(plan) {
   try {
-    const response = await apiClient.post("/api/plans", { plan });
+    const response = await apiClient.post("/plans", { plan });
     if (response.data?.ok !== true) {
       throw new Error(response.data?.error ?? "تعذر حفظ الخطة على الخادم.");
     }
@@ -42,7 +42,7 @@ export async function savePlanToServer(plan) {
  */
 export async function loadPlanFromServer() {
   try {
-    const response = await apiClient.get("/api/plans/mine");
+    const response = await apiClient.get("/plans/mine");
     if (response.data?.ok !== true || !response.data?.plan) {
       return null;
     }

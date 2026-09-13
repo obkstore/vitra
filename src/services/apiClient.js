@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getToken } from "./authService.js";
+import { BASE_URL } from "./apiConfig.js";
 
 /**
  * Centralized Axios instance for all VITRA API calls.
@@ -10,6 +11,7 @@ import { getToken } from "./authService.js";
  * user session, so auto-logout here would cause accidental logouts.
  */
 const apiClient = axios.create({
+  baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
 });
 

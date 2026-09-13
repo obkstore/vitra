@@ -91,13 +91,13 @@ function buildInsights(userProfile, score, mentalScore, activityScore, nutrition
 		);
 	}
 
-	if (sleepQuality <= 2) {
+	if (sleepQuality >= 4) {
 		insights.push(
 			"جودة نومك تحتاج تحسيناً - تجنب الكافيين بعد الساعة 2 ظهراً وجرّب شاي البابونج",
 		);
 	}
 
-	if (energyLevel <= 2) {
+	if (energyLevel >= 4) {
 		insights.push("طاقتك منخفضة - تناول وجبات صغيرة كل 3 ساعات وزد شرب الماء");
 	}
 
@@ -216,7 +216,11 @@ export function calculateMentalScore(mentalState) {
 	const sleepQuality = normalizeLikert(mentalState?.sleepQuality);
 	const energyLevel = normalizeLikert(mentalState?.energyLevel);
 
-	const rawScore = ((6 - stressLevel + sleepQuality + energyLevel) / 15) * 100;
+	// All three inputs use a 1-5 scale where 1 = best and 5 = worst
+	// (e.g. sleep: 1 = ممتاز, 5 = سيء جداً). Invert all of them so
+	// that higher contributions mean a healthier mental state.
+	const inverted = 6 - stressLevel + 6 - sleepQuality + 6 - energyLevel;
+	const rawScore = (inverted / 15) * 100;
 	return clampScore(rawScore);
 }
 

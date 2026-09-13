@@ -8,7 +8,7 @@ import "dotenv/config";
 import app from "./api/app.js";
 import { connectDB } from "./api/config/db.js";
 
-const PORT = process.env.PORT ?? 5000;
+const PORT = process.env.PORT || 5000;
 
 try {
   await connectDB();

@@ -78,7 +78,13 @@ export default function Slider({
     : clampedValue;
 
   return (
-    <div className={clsx(scopeClass, 'w-full', className)} style={{ '--slider-thumb-color': selectedColor.hex }}>
+    <div
+      className={clsx(scopeClass, 'w-full', className)}
+      style={{
+        '--slider-thumb-color': selectedColor.hex,
+        '--slider-fill': `${percentage}%`,
+      }}
+    >
       <style>{`
         .${scopeClass} .slider-range {
           -webkit-appearance: none;
@@ -87,8 +93,21 @@ export default function Slider({
           height: 0.5rem;
           border-radius: 9999px;
           background-color: #e2e8f0;
+          background-image: linear-gradient(to right,
+            var(--slider-thumb-color) 0%,
+            var(--slider-thumb-color) var(--slider-fill),
+            transparent var(--slider-fill),
+            transparent 100%);
           outline: none;
           transition: all 200ms ease;
+        }
+
+        .${scopeClass}:dir(rtl) .slider-range {
+          background-image: linear-gradient(to left,
+            var(--slider-thumb-color) 0%,
+            var(--slider-thumb-color) var(--slider-fill),
+            transparent var(--slider-fill),
+            transparent 100%);
         }
 
         .${scopeClass} .slider-range::-webkit-slider-thumb {
@@ -141,9 +160,6 @@ export default function Slider({
         value={clampedValue}
         onChange={onChange}
         className="slider-range w-full cursor-pointer"
-        style={{
-          background: `linear-gradient(to right, ${selectedColor.hex} 0%, ${selectedColor.hex} ${percentage}%, #e2e8f0 ${percentage}%, #e2e8f0 100%)`,
-        }}
         {...rest}
       />
 

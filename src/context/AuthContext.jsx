@@ -108,7 +108,7 @@ export function AuthProvider({ children }) {
     if (!authState.isAuthenticated) return;
     let cancelled = false;
     apiClient
-      .get("/api/auth/me")
+      .get("/auth/me")
       .then((response) => {
         if (cancelled) return;
         const prev = authStateRef.current;
@@ -149,7 +149,7 @@ export function AuthProvider({ children }) {
 
   /**
    * Logs in and syncs context state with the persisted session.
-   * @param {{ username: string, password: string }} credentials Credentials.
+   * @param {{ email: string, password: string }} credentials Credentials.
    * @returns {Promise<{ token: string, username: string, assignedPage: string, role: string }>} Session.
    */
   const login = useCallback(async (credentials) => {
@@ -175,7 +175,7 @@ export function AuthProvider({ children }) {
 
   /**
    * Registers a new user and syncs context state with the persisted session.
-   * @param {{ username: string, password: string }} data Registration data.
+   * @param {{ email: string, username: string, password: string }} data Registration data.
    * @returns {Promise<{ token: string, username: string, assignedPage: string, role: string }>} Session.
    */
   const register = useCallback(async (data) => {

@@ -60,7 +60,7 @@ export async function submitConsultationRequest(data) {
   }
 
   try {
-    const response = await apiClient.post("/api/consultation", { email, phone, message });
+    const response = await apiClient.post("/consultation", { email, phone, message });
     if (response.data?.ok !== true || !response.data?.request) {
       throw new Error(response.data?.error ?? "تعذر إرسال الطلب. حاول مجدداً.");
     }
@@ -83,7 +83,7 @@ export async function fetchConsultationRequests(options = {}) {
   if (options.limit) params.limit = options.limit;
 
   try {
-    const response = await apiClient.get("/api/admin/requests", { params });
+    const response = await apiClient.get("/admin/requests", { params });
     if (response.data?.ok !== true || !Array.isArray(response.data?.requests)) {
       throw new Error(response.data?.error ?? "تعذر تحميل الطلبات.");
     }
@@ -115,7 +115,7 @@ export async function updateConsultationRequestStatus(id, status) {
   }
 
   try {
-    const response = await apiClient.patch(`/api/admin/requests/${id}`, { status });
+    const response = await apiClient.patch(`/admin/requests/${id}`, { status });
     if (response.data?.ok !== true || !response.data?.request) {
       throw new Error(response.data?.error ?? "تعذر تحديث الحالة.");
     }

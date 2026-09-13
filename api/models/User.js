@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 
 const SALT_ROUNDS = 10;
 
@@ -18,6 +19,22 @@ const userSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       minlength: [3, "username must be at least 3 characters"],
+    },
+    email: {
+      type: String,
+      required: [true, "email is required"],
+      unique: true,
+      trim: true,
+      lowercase: true,
+      match: [/^\S+@\S+\.\S+$/, "email is invalid"],
+    },
+    resetPasswordToken: {
+      type: String,
+      select: false,
+    },
+    resetPasswordExpires: {
+      type: Date,
+      select: false,
     },
     password: {
       type: String,
@@ -57,6 +74,17 @@ userSchema.pre("save", async function () {
 // Compare a plain-text candidate password with the stored hash.
 userSchema.methods.comparePassword = function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
+};
+
+// Generate a reset password token.
+userSchema.methods.createResetPasswordToken = function () {
+  const resetToken = Math.random().toString(36).substring(2, 16) + Math.random().toString(36).substring(2, 16);
+
+  // Hash token and set resetPasswordToken and resetPasswordExpires
+  this.resetPasswordToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+  this.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+
+  return resetToken;
 };
 
 // Hide password hash when serializing.

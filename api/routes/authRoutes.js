@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { login, register } from "../controllers/authController.js";
+import { login, register, forgotPassword, resetPassword } from "../controllers/authController.js";
 import { requireAuth } from "../middleware/authMiddleware.js";
 import User from "../models/User.js";
 
@@ -10,6 +10,12 @@ router.post("/login", login);
 
 // POST /api/auth/register — create a user (password hashed by the User model)
 router.post("/register", register);
+
+// POST /api/auth/forgot-password — send a password reset link
+router.post("/forgot-password", forgotPassword);
+
+// POST /api/auth/reset-password/:token — reset password with a valid token
+router.post("/reset-password/:token", resetPassword);
 
 // GET /api/auth/me — validate the session, return identity + assignedPage.
 // Lets the client verify a stored token (and powers future token-expiry

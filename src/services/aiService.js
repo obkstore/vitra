@@ -1,5 +1,6 @@
 import axios from "axios";
 import apiClient from "./apiClient.js";
+import { BASE_URL } from "./apiConfig.js";
 import toast from "react-hot-toast";
 import { calculateBalanceIndex } from "../utils/balanceIndex.js";
 import { formatNutritionSummary } from "../utils/nutritionCalculator.js";
@@ -10,7 +11,7 @@ import { formatNutritionSummary } from "../utils/nutritionCalculator.js";
  * as GEMINI_API_KEY.
  */
 const AI_CONFIG = {
-	apiUrl: "/api/generate-plan",
+	apiUrl: `${BASE_URL}/generate-plan`,
 };
 
 const MEAL_TYPE_LABELS = {
@@ -361,7 +362,7 @@ export const generateHealthPlanMock = async (userProfile, nutritionSummary) => {
 	const stressLevel = Number(safeMentalState?.stressLevel);
 	const energyLevel = Number(safeMentalState?.energyLevel);
 	const isHighStress = Number.isFinite(stressLevel) ? stressLevel >= 4 : false;
-	const isLowEnergy = Number.isFinite(energyLevel) ? energyLevel <= 2 : false;
+	const isLowEnergy = Number.isFinite(energyLevel) ? energyLevel >= 4 : false;
 
 	const forbiddenFoods = Array.isArray(safeFoodPreferences?.forbiddenFoods)
 		? safeFoodPreferences.forbiddenFoods

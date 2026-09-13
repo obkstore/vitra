@@ -1,4 +1,6 @@
+import "dotenv/config";
 import express from "express";
+import cors from "cors";
 import helmet from "helmet";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import authRoutes from "./routes/authRoutes.js";
@@ -8,6 +10,8 @@ import adminRoutes from "./routes/adminRoutes.js";
 import generatePlanHandler from "./generate-plan.mjs"; // Adjust path if it's in another folder
 
 const app = express();
+
+app.use(cors({ origin: true, credentials: true }));
 
 // Security headers (CSP defaults would break the Vite SPA shell, so the
 // rest of helmet's headers apply; revisit contentSecurityPolicy when the

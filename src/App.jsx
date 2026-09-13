@@ -13,6 +13,8 @@ const AuthPage = lazy(() => import("./pages/AuthPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AdminHomePage = lazy(() => import("./pages/AdminHomePage"));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 
 function LoadingFallback() {
 	return (
@@ -85,6 +87,8 @@ function App() {
 						</RequireAdmin>
 					}
 				/>
+					<Route path="/forgot-password" element={<ForgotPasswordPage />} />
+				<Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 					<Route path="/404" element={<NotFoundPage />} />
 					<Route path="*" element={<Navigate to="/404" replace />} />
 				</Routes>

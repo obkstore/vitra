@@ -1,4 +1,5 @@
 import axios from "axios";
+import { BASE_URL } from "./apiConfig.js";
 
 /**
  * Centralized auth service for VITRA.
@@ -13,8 +14,8 @@ export const USERNAME_KEY = "vitra_username";
 export const ASSIGNED_PAGE_KEY = "vitra_assigned_page";
 export const ROLE_KEY = "vitra_role";
 
-const LOGIN_URL = "/api/auth/login";
-const REGISTER_URL = "/api/auth/register";
+const LOGIN_URL = `${BASE_URL}/auth/login`;
+const REGISTER_URL = `${BASE_URL}/auth/register`;
 
 const FALLBACK_LOGIN_MESSAGE = "تعذر تسجيل الدخول. تحقق من البيانات وحاول مجدداً.";
 const FALLBACK_REGISTER_MESSAGE = "تعذر إنشاء الحساب. تحقق من البيانات وحاول مجدداً.";
@@ -195,6 +196,9 @@ function mapValidationMessage(serverError, mode) {
   if (text.includes("username already exists")) {
     return "اسم المستخدم موجود مسبقاً. اختر اسماً آخر.";
   }
+  if (text.includes("email already exists")) {
+    return "البريد الإلكتروني موجود مسبقاً. سجّل الدخول أو استخدم بريداً آخر.";
+  }
   if (text.includes("invalid credentials")) {
     return "بيانات الدخول غير صحيحة. تحقق وحاول مجدداً.";
   }
@@ -254,6 +258,9 @@ function normalizeAuthError(error, mode) {
       throw createAuthError("بيانات الدخول غير صحيحة. تحقق وحاول مجدداً.", statusCode, error.response?.data);
     }
     if (statusCode === 409) {
+      if (String(serverError ?? "").toLowerCase().includes("email")) {
+        throw createAuthError("البريد الإلكتروني موجود مسبقاً. سجّل الدخول أو استخدم بريداً آخر.", statusCode, error.response?.data);
+      }
       throw createAuthError("اسم المستخدم موجود مسبقاً. اختر اسماً آخر.", statusCode, error.response?.data);
     }
     if (typeof statusCode === "number" && statusCode >= 500) {
@@ -303,22 +310,22 @@ function handleAuthPayload(payload, mode) {
 }
 
 /**
- * Logs in with username + password and persists the session.
- * @param {{ username: string, password: string }} credentials Credentials.
+ * Logs in with email + password and persists the session.
+ * @param {{ email: string, password: string }} credentials Credentials.
  * @returns {Promise<{ token: string, username: string, assignedPage: string }>} Session.
  */
 export async function login(credentials) {
-  const username = String(credentials?.username ?? "").trim();
+  const email = String(credentials?.email ?? "").trim();
   const password = String(credentials?.password ?? "");
 
-  if (!username || !password) {
-    throw createAuthError("يرجى إدخال اسم المستخدم وكلمة المرور.", 400);
+  if (!email || !password) {
+    throw createAuthError("يرجى إدخال البريد الإلكتروني وكلمة المرور.", 400);
   }
 
   try {
     const response = await axios.post(
       LOGIN_URL,
-      { username, password },
+      { email, password },
       { headers: { "Content-Type": "application/json" } },
     );
     return handleAuthPayload(response.data, "login");
@@ -332,21 +339,22 @@ export async function login(credentials) {
 /**
  * Registers a new user and persists the session. assignedPage is derived
  * server-side as `/dashboard/<username>` — the client never sends it.
- * @param {{ username: string, password: string }} data Registration data.
+ * @param {{ email: string, username: string, password: string }} data Registration data.
  * @returns {Promise<{ token: string, username: string, assignedPage: string }>} Session.
  */
 export async function register(data) {
   const username = String(data?.username ?? "").trim();
+  const email = String(data?.email ?? "").trim();
   const password = String(data?.password ?? "");
 
-  if (!username || !password) {
-    throw createAuthError("يرجى إدخال اسم المستخدم وكلمة المرور.", 400);
+  if (!username || !email || !password) {
+    throw createAuthError("يرجى إدخال اسم المستخدم والبريد الإلكتروني وكلمة المرور.", 400);
   }
 
   try {
     const response = await axios.post(
       REGISTER_URL,
-      { username, password },
+      { username, email, password },
       { headers: { "Content-Type": "application/json" } },
     );
     return handleAuthPayload(response.data, "register");

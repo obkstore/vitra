@@ -27,7 +27,7 @@ export default function AuthPage() {
 
 	const copy = {
 		title: mode === "login" ? "مرحباً بعودتك" : "أنشئ حسابك في VITRA",
-		subtitle: "احفظ خطتك وارجع إليها بسهولة على هذا الجهاز.",
+		subtitle: mode === "login" ? "احفظ خطتك وارجع إليها بسهولة على هذا الجهاز." : "خطوتك الأولى towards a healthier you.",
 		switchText: mode === "login" ? "جديد على VITRA؟" : "لديك حساب بالفعل?",
 		switchAction: mode === "login" ? "إنشاء حساب" : "تسجيل الدخول",
 	};
@@ -35,9 +35,12 @@ export default function AuthPage() {
 	// Already logged in: land each user on THEIR diet plan page.
 	useEffect(() => {
 		if (isAuthenticated) {
-			navigate(resolveAssignedPage(assignedPage), { replace: true });
+			// If user has an assigned plan page, go there
+			// If not (first time), go to onboarding
+			const page = assignedPage || "/onboarding";
+			navigate(resolveAssignedPage(page), { replace: true });
 		}
-	}, [isAuthenticated, assignedPage, navigate]);
+	}, [isAuthenticated, assignedPage, navigate, mode]);
 
 	/**
 	 * Handles a successful login/register session from AuthForm.
@@ -60,10 +63,31 @@ export default function AuthPage() {
 					</div>
 					<AuthForm mode={mode} onSuccess={handleSuccess} />
 					<div className="mt-5 flex flex-col gap-3 text-center">
+						{mode === "login" && (
+							<a
+								href="/forgot-password"
+								className="text-sm font-semibold text-brand-700 hover:text-brand-900 underline"
+							>
+								نسيت كلمة المرور؟
+							</a>
+						)}
 						<button type="button" className="text-sm font-semibold text-brand-700 hover:text-brand-900" onClick={() => setMode(mode === "login" ? "register" : "login")}>
 							{copy.switchText} {copy.switchAction}
 						</button>
-						<Button variant="secondary" onClick={() => navigate("/onboarding")}>المتابعة كضيف</Button>
+						{isAuthenticated ? (
+							// If user has a plan, show dashboard button; otherwise onboarding
+							assignedPage ? (
+								<Button variant="secondary" onClick={() => navigate(assignedPage)}>
+									مواصلة الخطة
+								</Button>
+							) : (
+								<Button variant="secondary" onClick={() => navigate("/onboarding")}>
+									المتابعة كضيف / بدء الجولة
+								</Button>
+							)
+						) : (
+							<Button variant="secondary" onClick={() => navigate("/onboarding")}>المتابعة كضيف</Button>
+						)}
 						<button type="button" className="inline-flex items-center justify-center gap-2 text-sm text-slate-500 hover:text-slate-800" onClick={() => navigate("/")}>
 							<ArrowLeft className="h-4 w-4" /> الرئيسية
 						</button>

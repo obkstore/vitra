@@ -28,13 +28,13 @@ export default function AuthForm({ mode, onSuccess }) {
     formState: { errors },
   } = useForm({
     resolver: zodResolver(isRegister ? registerSchema : loginSchema),
-    defaultValues: { username: "", password: "" },
+    defaultValues: { username: "", email: "", password: "" },
     mode: "onTouched",
   });
 
   // Clear stale values + server errors when switching modes.
   useEffect(() => {
-    reset({ username: "", password: "" });
+    reset({ username: "", email: "", password: "" });
     clearAuthError();
   }, [mode, reset, clearAuthError]);
 
@@ -45,8 +45,8 @@ export default function AuthForm({ mode, onSuccess }) {
   async function onSubmit(data) {
     try {
       const session = isRegister
-        ? await register({ username: data.username.trim(), password: data.password })
-        : await login({ username: data.username.trim(), password: data.password });
+        ? await register({ username: data.username.trim(), email: data.email, password: data.password })
+        : await login({ email: data.email, password: data.password });
       toast.success(isRegister ? "تم إنشاء الحساب بنجاح." : "تم تسجيل الدخول بنجاح.");
       onSuccess?.(session);
     } catch (error) {
@@ -57,11 +57,21 @@ export default function AuthForm({ mode, onSuccess }) {
   return (
     <form className="mt-7 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
       <Input
-        label="اسم المستخدم"
+        label={isRegister ? "اسم المستخدم" : "اسم المستخدم (اختياري)"}
         type="text"
         autoComplete="username"
-        error={errors.username?.message}
+        hint={isRegister ? undefined : "اختياري — تسجيل الدخول بالبريد الإلكتروني"}
+        disabled={!isRegister}
+        className={!isRegister ? "opacity-50 bg-slate-50" : undefined}
+        error={isRegister ? errors.username?.message : undefined}
         {...registerField("username")}
+      />
+      <Input
+        label="البريد الإلكتروني"
+        type="email"
+        autoComplete="email"
+        error={errors.email?.message}
+        {...registerField("email")}
       />
       <Input
         label="كلمة المرور"

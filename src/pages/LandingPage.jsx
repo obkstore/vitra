@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   BarChart3,
   Brain,
-  ChartColumnIncreasing,
   CheckCircle2,
   Cross,
   Cpu,
@@ -106,11 +105,6 @@ const vitraSteps = [
     icon: Layers3,
     title: 'خطة متكاملة',
     body: 'غذاء + دعم نفسي + برنامج رياضي مصممة لك تحديداً',
-  },
-  {
-    icon: ChartColumnIncreasing,
-    title: 'متابعة ومؤشر وعي',
-    body: 'تتبّع مستمر يقيس تحسّنك الفعلي مع الوقت',
   },
 ];
 
@@ -696,8 +690,8 @@ export default function LandingPage() {
         <section id="problem" className="bg-[#EEF2F0] py-24 md:py-28 text-[#0D1117]">
           <div className="mx-auto w-full max-w-7xl px-4 md:px-8">
             <div className="max-w-3xl">
-              <p className="text-sm font-semibold text-[#1B4D3E]">لنبدأ بحقيقة</p>
-              <h2 className="mt-3 text-3xl md:text-5xl font-black leading-tight text-[#0D1117]">
+              <p className="text-base font-semibold text-[#1B4D3E]">لنبدأ بحقيقة</p>
+              <h2 className="mt-3 text-2xl md:text-4xl font-black leading-relaxed text-[#0D1117]">
                 مين فينا ما حسّ بيوم إنّو تعبان ... وما لقى مين يفهمه؟
               </h2>
               <p className="mt-4 text-lg leading-relaxed text-slate-700">
@@ -722,8 +716,8 @@ export default function LandingPage() {
         <section className="bg-white py-24 md:py-28 text-[#0D1117]">
           <div className="mx-auto w-full max-w-7xl px-4 md:px-8">
             <div className="max-w-3xl">
-              <p className="text-sm font-semibold text-[#E8935C]">لكن...</p>
-              <h2 className="mt-3 text-3xl md:text-5xl font-black leading-tight text-[#0D1117]">
+              <p className="text-base font-semibold text-[#E8935C]">لكن...</p>
+              <h2 className="mt-3 text-2xl md:text-4xl font-black leading-relaxed text-[#0D1117]">
                 الحل موجود ... لكنه مبعثر، بطيء، ومكلف
               </h2>
             </div>
@@ -745,7 +739,7 @@ export default function LandingPage() {
         <section className="bg-[#EEF2F0] py-24 md:py-28 text-[#0D1117]">
           <div className="mx-auto w-full max-w-7xl px-4 md:px-8">
             <div className="text-center max-w-3xl mx-auto">
-              <h2 className="text-3xl md:text-5xl font-black leading-tight text-[#0D1117]">
+              <h2 className="text-2xl md:text-4xl font-black leading-relaxed text-[#0D1117]">
                 ماذا لو اجتمعت الحلول الثلاثة ... في مكان واحد؟
               </h2>
 
@@ -770,7 +764,7 @@ export default function LandingPage() {
         <section className="bg-[#0D1117] py-24 md:py-28 text-slate-100">
           <div className="mx-auto w-full max-w-7xl px-4 md:px-8">
             <div className="text-center max-w-3xl mx-auto">
-              <h2 className="text-3xl md:text-5xl font-black leading-tight text-white">
+              <h2 className="text-2xl md:text-4xl font-black leading-relaxed text-white">
                 كيف يعمل VITRA؟
               </h2>
             </div>
@@ -778,7 +772,7 @@ export default function LandingPage() {
             <div className="relative mt-12">
               <div className="hidden lg:block absolute top-10 inset-x-8 h-px bg-white/10" />
 
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+              <div className="relative grid grid-cols-1 gap-4 lg:grid-cols-3">
                 {vitraSteps.map((step, index) => (
                   <StepCard
                     key={step.title}
@@ -802,8 +796,8 @@ export default function LandingPage() {
         <section className="bg-[#EEF2F0] py-24 md:py-28 text-[#0D1117]">
           <div className="mx-auto w-full max-w-7xl px-4 md:px-8">
             <div className="max-w-3xl">
-              <p className="text-sm font-semibold text-[#1B4D3E]">لسنا تطبيق تغذية آخر</p>
-              <h2 className="mt-3 text-3xl md:text-5xl font-black leading-tight text-[#0D1117]">
+              <p className="text-base font-semibold text-[#1B4D3E]">لسنا تطبيق تغذية آخر</p>
+              <h2 className="mt-3 text-2xl md:text-4xl font-black leading-relaxed text-[#0D1117]">
                 نحن نربط بين ما تأكله، وما تشعر به، وكيف تتحرك
               </h2>
             </div>
@@ -836,8 +830,8 @@ export default function LandingPage() {
         <section className="bg-[#0D1117] py-24 md:py-28 text-slate-100">
           <div className="mx-auto w-full max-w-7xl px-4 md:px-8">
             <div className="max-w-3xl">
-              <p className="text-sm font-semibold text-[#8DD9B0]">من نخدم؟</p>
-              <h2 className="mt-3 text-3xl md:text-5xl font-black leading-tight text-white">
+              <p className="text-base font-semibold text-[#8DD9B0]">من نخدم؟</p>
+              <h2 className="mt-3 text-2xl md:text-4xl font-black leading-relaxed text-white">
                 VITRA مناسب لمن يريد خطة مفهومة، واضحة، ومتوازنة
               </h2>
             </div>
@@ -847,10 +841,6 @@ export default function LandingPage() {
                 <BrandCard key={card.title} icon={card.icon} title={card.title} body={card.body} dark />
               ))}
             </div>
-
-            <div className="mt-8 rounded-[2rem] border border-white/10 bg-white/5 px-6 py-5 text-center text-sm text-slate-300 shadow-[0_18px_45px_rgba(0,0,0,0.14)]">
-              مجتمعنا في سوريا يمتد عبر أكثر من 24 عاماً من الخبرة المتراكمة، ويخدم جمهوراً يصل إلى 26.4 مليون إنسان يبحثون عن دعم أوضح وأقرب.
-            </div>
           </div>
         </section>
 
@@ -858,8 +848,8 @@ export default function LandingPage() {
           <div className="mx-auto w-full max-w-7xl px-4 md:px-8">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-3xl">
-                <p className="text-sm font-semibold text-[#1B4D3E]">جرّب VITRA بنفسك</p>
-                <h2 className="mt-3 text-3xl md:text-5xl font-black leading-tight text-[#0D1117]">
+                <p className="text-base font-semibold text-[#1B4D3E]">جرّب VITRA بنفسك</p>
+                <h2 className="mt-3 text-2xl md:text-4xl font-black leading-relaxed text-[#0D1117]">
                   هكذا تبدو خطتك الصحية قبل أن تبدأ الرحلة
                 </h2>
               </div>
@@ -890,9 +880,9 @@ export default function LandingPage() {
         <section className="bg-[#0D1117] py-24 md:py-28 text-slate-100">
           <div className="mx-auto w-full max-w-7xl px-4 md:px-8">
             <div className="max-w-3xl">
-              <p className="text-sm font-semibold text-[#E8935C]">خبراء حقيقيون خلف كل توصية</p>
-              <h2 className="mt-3 text-3xl md:text-5xl font-black leading-tight text-white">
-                فريق متعدد التخصصات يراجع ما يخرج من النظام
+              <p className="text-base font-semibold text-[#E8935C]">خبراء حقيقيون خلف كل توصية</p>
+              <h2 className="mt-3 text-2xl md:text-4xl font-black leading-relaxed text-white">
+                فريق متعدد التخصصات اجتمع لأجلك
               </h2>
             </div>
 
@@ -907,8 +897,8 @@ export default function LandingPage() {
         <section className="bg-[#EEF2F0] py-24 md:py-28 text-[#0D1117]">
           <div className="mx-auto w-full max-w-7xl px-4 md:px-8">
             <div className="text-center max-w-3xl mx-auto">
-              <p className="text-sm font-semibold text-[#1B4D3E]">VITRA</p>
-              <h2 className="mt-3 text-3xl md:text-5xl font-black leading-tight text-[#0D1117]">
+              <p className="text-base font-semibold text-[#1B4D3E]">VITRA</p>
+              <h2 className="mt-3 text-2xl md:text-4xl font-black leading-relaxed text-[#0D1117]">
                 التزامك ... سلامك...
               </h2>
             </div>
@@ -916,17 +906,17 @@ export default function LandingPage() {
             <div className="mt-10 overflow-hidden rounded-[2.25rem] border border-white/10 bg-[radial-gradient(circle_at_top,_rgba(232,147,92,0.18),_transparent_32%),linear-gradient(180deg,rgba(13,17,23,0.98),rgba(13,17,23,0.92))] px-6 py-10 text-white shadow-[0_25px_70px_rgba(0,0,0,0.3)] md:px-8">
               <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
                 <div className="max-w-3xl">
-                  <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80">
+                  <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-base font-semibold text-white/80">
                     <img src={brandLogo} alt="VITRA" className="h-5 w-5 object-contain" />
                     ابدأ مع VITRA اليوم
                   </div>
 
-                  <h3 className="mt-5 text-3xl md:text-5xl font-black leading-tight text-white">
+                  <h3 className="mt-5 text-2xl md:text-4xl font-black leading-relaxed text-white">
                     خطة واحدة... متابعة واحدة... وقرار أوضح كل يوم
                   </h3>
 
                   <p className="mt-4 text-lg leading-relaxed text-slate-300">
-                    اجمع بين الدعم النفسي، والغذاء، والحركة، داخل تجربة عربية سهلة تقرّبك من الهدف دون تشتيت.
+                    اجمع بين الدعم النفسي، والغذاء، والحركة، داخل تجربة سهلة تقرّبك من الهدف دون تشتيت.
                   </p>
                 </div>
 
