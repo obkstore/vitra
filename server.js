@@ -21,7 +21,7 @@ try {
 app.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);
 });
-const path = require('path');
+import path from 'path';
 
 // --- Your API routes should be defined ABOVE this line ---
 
