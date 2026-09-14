@@ -20,8 +20,4 @@ try {
 
 app.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);
-<<<<<<< HEAD
 });
-=======
-});
->>>>>>> 7b2bdaf97c2fcc8309379281b83d5fec43e4aa81
