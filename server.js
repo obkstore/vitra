@@ -21,3 +21,15 @@ try {
 app.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);
 });
+const path = require('path');
+
+// --- Your API routes should be defined ABOVE this line ---
+
+// 1. Serve static files from your frontend build folder
+// (Change 'client/dist' to match your actual frontend folder structure, e.g., 'client/build' or 'public')
+app.use(express.static(path.join(__dirname, 'client', 'dist')));
+
+// 2. Catch-all route to serve your frontend's index.html for any unknown routes (crucial for SPAs)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'client', 'dist', 'index.html'));
+});
