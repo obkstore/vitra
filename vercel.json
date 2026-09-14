@@ -1,22 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "api/generate-plan.mjs": {
-      "maxDuration": 60
-    },
-    "api/auth/[...path].js": {
-      "maxDuration": 15
-    },
-    "api/plans/[...path].js": {
-      "maxDuration": 15
-    },
-    "api/consultation/[...path].js": {
-      "maxDuration": 15
-    },
-    "api/admin/[...path].js": {
-      "maxDuration": 15
-    }
-  },
   "rewrites": [
     {
       "source": "/(.*)",
