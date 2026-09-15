@@ -10,7 +10,7 @@
 /** @typedef {import("../types/index.js").UserProfile} UserProfile */
 /** @typedef {import("../types/index.js").GeneratedPlan} GeneratedPlan */
 
-import { formatTherapeuticGuidanceSummary, getForbiddenTermsForProfile, textContainsForbiddenTerm } from "./therapeuticGuidance.js";
+import { formatTherapeuticGuidanceSummary, getForbiddenTermsForProfile, getTherapeuticGuidance, textContainsForbiddenTerm } from "./therapeuticGuidance.js";
 
 const GOAL_AR = {
 	lose_weight: "خسارة الوزن",
@@ -131,6 +131,27 @@ function formatListOrFallback(values, fallback) {
 }
 
 /**
+ * Builds the strict diet-constraint section placed FIRST in the user prompt
+ * so restrictive diets (vegan, vegetarian, keto) are impossible to miss.
+ * Terms come from the same DIET_GUIDANCE object the validator reads, so the
+ * prompt and validatePlanAgainstProfile() cannot drift apart. Returns ""
+ * for diets without bans (omnivore/unknown) at zero token cost.
+ * @param {UserProfile} userProfile Full user profile.
+ * @returns {string} Constraint block, or "" when the diet bans nothing.
+ */
+export function buildDietConstraintSection(userProfile) {
+	const diet = getTherapeuticGuidance(userProfile).diet;
+	const forbiddenKeywords = Array.isArray(diet?.forbiddenKeywords) ? diet.forbiddenKeywords : [];
+	if (forbiddenKeywords.length === 0) return "";
+	return [
+		"=== قيود الحمية الصارمة — التزام حرفي ===",
+		`STRICTLY FORBIDDEN for this ${diet.key} (${diet.labelAr}) diet: ${forbiddenKeywords.join("، ")}.`,
+		"Every single ingredient and meal in this plan must comply — no exceptions, no substitutions containing these terms.",
+		"Before finalizing, mentally verify no forbidden term appears anywhere in the output.",
+	].join("\n");
+}
+
+/**
  * Builds the user prompt containing profile summary and strict JSON template.
  * @param {UserProfile} userProfile Full user profile.
  * @param {{
@@ -178,8 +199,6 @@ export function buildUserPrompt(userProfile, nutritionSummary, guideText = "") {
 		healthWarnings.push(`🚫 أطعمة محظورة تماماً: ${forbiddenFoods.join("، ")}`);
 	if (allergies.length > 0)
 		healthWarnings.push(`🚨 حساسية طعام خطيرة من: ${allergies.join("، ")}`);
-	if (userProfile.foodPreferences?.dietType === "vegan")
-		healthWarnings.push("🌱 النظام نباتي صرف — استخدم بدائل الحليب النباتية (مثل حليب الشوفان، حليب اللوز) ويُمنع منعاً باتاً استخدام منتجات الألبان الحيوانية (حليب بقري، لبن، جبن، زبادي).");
 
 	const warningsBlock = healthWarnings.length > 0
 		? `\n=== تحذيرات صحية حرجة — يجب الالتزام بها ===\n${healthWarnings.join("\n")}\n`
@@ -377,6 +396,7 @@ export function buildUserPrompt(userProfile, nutritionSummary, guideText = "") {
 	].join("\n");
 
 	return [
+		buildDietConstraintSection(userProfile),
 		warningsBlock,
 		therapeuticGuidance,
 		String(guideText ?? "").trim()

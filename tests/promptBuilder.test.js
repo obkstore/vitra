@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateAIResponse, validatePlanAgainstProfile, buildUserPrompt, buildSemanticRetryNote, extractJsonCandidate } from '../src/utils/promptBuilder.js';
+import { validateAIResponse, validatePlanAgainstProfile, buildUserPrompt, buildSemanticRetryNote, extractJsonCandidate, buildDietConstraintSection } from '../src/utils/promptBuilder.js';
 import { textContainsForbiddenTerm, getForbiddenTermsForProfile } from '../src/utils/therapeuticGuidance.js';
 
 function buildValidPayload() {
@@ -355,4 +355,63 @@ test('buildSemanticRetryNote stays generic without diet or restrictions', () => 
 
   assert.ok(note.includes('"سكر"'));
   assert.ok(note.includes('JSON فقط'));
+});
+
+test('buildDietConstraintSection lists exact source terms per diet', () => {
+  const vegan = buildDietConstraintSection(buildVeganProfile());
+  for (const term of ['لحم', 'دجاج', 'سمك', 'بيض', 'حليب', 'لبن', 'زبادي', 'جبن', 'سمن']) {
+    assert.ok(vegan.includes(term), `expected vegan section to list ${term}`);
+  }
+  assert.ok(vegan.includes('STRICTLY FORBIDDEN'));
+  assert.ok(vegan.includes('vegan'));
+
+  const vegetarian = buildValidPayload().userProfile;
+  vegetarian.foodPreferences.dietType = 'vegetarian';
+  const vegSection = buildDietConstraintSection(vegetarian);
+  assert.ok(vegSection.includes('لحم'));
+  assert.ok(vegSection.includes('سمك'));
+  assert.equal(vegSection.includes('حليب'), false);
+
+  const keto = buildValidPayload().userProfile;
+  keto.foodPreferences.dietType = 'keto';
+  const ketoSection = buildDietConstraintSection(keto);
+  assert.ok(ketoSection.includes('خبز'));
+  assert.ok(ketoSection.includes('سكر'));
+});
+
+test('buildDietConstraintSection omits ban-free and unknown diets', () => {
+  assert.equal(buildDietConstraintSection(buildValidPayload().userProfile), '');
+
+  const unknown = buildValidPayload().userProfile;
+  unknown.foodPreferences.dietType = 'paleo';
+  assert.equal(buildDietConstraintSection(unknown), '');
+});
+
+test('diet section is the first block of the user prompt', () => {
+  const { userProfile, nutritionSummary } = buildPromptFixtures();
+  userProfile.foodPreferences.dietType = 'vegan';
+
+  const prompt = buildUserPrompt(userProfile, nutritionSummary);
+  assert.ok(prompt.startsWith('=== قيود الحمية الصارمة'));
+});
+
+test('diet section terms always match validator forbidden terms', () => {
+  const cases = {
+    vegan: ['لحم', 'دجاج', 'سمك', 'بيض', 'حليب', 'لبن', 'زبادي', 'جبن', 'سمن'],
+    vegetarian: ['لحم', 'دجاج', 'سمك', 'تونة', 'سلمون'],
+    keto: ['أرز', 'خبز', 'مكرونة', 'معكرونة', 'باستا', 'بطاطا', 'بطاطس', 'سكر', 'حلويات', 'عصير'],
+  };
+  for (const [dietType, terms] of Object.entries(cases)) {
+    const profile = buildValidPayload().userProfile;
+    profile.foodPreferences.dietType = dietType;
+    profile.foodPreferences.allergies = [];
+    profile.foodPreferences.forbiddenFoods = [];
+
+    const section = buildDietConstraintSection(profile);
+    const forbidden = getForbiddenTermsForProfile(profile);
+    for (const term of terms) {
+      assert.ok(section.includes(term), `${dietType} section missing ${term}`);
+      assert.ok(forbidden.includes(term), `${dietType} validator missing ${term}`);
+    }
+  }
 });
