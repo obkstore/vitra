@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateAIResponse, validatePlanAgainstProfile, buildUserPrompt } from '../src/utils/promptBuilder.js';
+import { validateAIResponse, validatePlanAgainstProfile, buildUserPrompt, buildSemanticRetryNote, extractJsonCandidate } from '../src/utils/promptBuilder.js';
 import { textContainsForbiddenTerm, getForbiddenTermsForProfile } from '../src/utils/therapeuticGuidance.js';
 
 function buildValidPayload() {
@@ -289,4 +289,70 @@ test('buildUserPrompt stays backward compatible without guide argument', () => {
 
   assert.equal(prompt.includes('دليل الأنظمة الغذائية العلاجية المعتمد'), false);
   assert.ok(prompt.includes('=== بيانات المستخدم ==='));
+});
+
+test('extractJsonCandidate passes pure JSON through untouched', () => {
+  const json = JSON.stringify(buildValidPayload());
+  assert.equal(extractJsonCandidate(json), json);
+  assert.equal(extractJsonCandidate('  ' + json + '  '), json);
+  assert.equal(extractJsonCandidate(''), '');
+});
+
+test('extractJsonCandidate strips prose wrapping around JSON', () => {
+  const json = JSON.stringify(buildValidPayload());
+  const wrapped = `إليك الخطة المطلوبة:\n${json}\nبالتوفيق!`;
+  assert.equal(extractJsonCandidate(wrapped), json);
+});
+
+test('extractJsonCandidate respects braces inside strings', () => {
+  const text = 'تم: {"x": "a}b { c", "y": 1} شكراً';
+  assert.equal(extractJsonCandidate(text), '{"x": "a}b { c", "y": 1}');
+});
+
+test('extractJsonCandidate leaves non-JSON input for the existing error path', () => {
+  assert.equal(extractJsonCandidate('مجرد نص بدون أقواس'), 'مجرد نص بدون أقواس');
+  assert.equal(extractJsonCandidate('{ oops'), '{ oops');
+});
+
+test('validateAIResponse accepts prose-wrapped JSON after extraction', () => {
+  const json = JSON.stringify(buildValidPayload());
+  const result = validateAIResponse(`إليك الخطة:\n${json}\nانتهى.`);
+  assert.equal(result.isValid, true);
+  assert.equal(result.error, null);
+});
+
+test('validateAIResponse still rejects pure prose with the same error', () => {
+  const result = validateAIResponse('عذراً، لا أستطيع الإجابة.');
+  assert.equal(result.isValid, false);
+  assert.equal(result.error, 'تعذر تحليل الاستجابة كـ JSON صالح');
+});
+
+test('buildSemanticRetryNote names the term and vegan constraints', () => {
+  const profile = buildVeganProfile();
+  const note = buildSemanticRetryNote(profile, 'لحم');
+
+  assert.ok(note.includes('"لحم"'));
+  assert.ok(note.includes('نباتي صرف'));
+  assert.ok(note.includes('JSON فقط'));
+});
+
+test('buildSemanticRetryNote adapts to vegetarian and lists allergies', () => {
+  const profile = buildValidPayload().userProfile;
+  profile.foodPreferences.dietType = 'vegetarian';
+  profile.foodPreferences.allergies = ['فول سوداني'];
+  profile.healthConditions = ['diabetes'];
+  const note = buildSemanticRetryNote(profile, 'دجاج');
+
+  assert.ok(note.includes('"دجاج"'));
+  assert.ok(note.includes('نباتي (vegetarian)'));
+  assert.ok(note.includes('فول سوداني'));
+  assert.ok(note.includes('diabetes'));
+});
+
+test('buildSemanticRetryNote stays generic without diet or restrictions', () => {
+  const profile = buildValidPayload().userProfile;
+  const note = buildSemanticRetryNote(profile, 'سكر');
+
+  assert.ok(note.includes('"سكر"'));
+  assert.ok(note.includes('JSON فقط'));
 });

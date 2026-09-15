@@ -451,6 +451,49 @@ export function validatePlanAgainstProfile(plan, userProfile) {
 }
 
 /**
+ * Builds a correction suffix for a single regeneration attempt after a
+ * semantic rejection. Names the exact violated constraint so the model can
+ * repair it. The caller caps usage at one retry to bound quota cost.
+ * @param {UserProfile} userProfile User profile that defines the restrictions.
+ * @param {string} offendingTerm Forbidden term found in the rejected plan.
+ * @returns {string} Correction block to append to the user prompt.
+ */
+export function buildSemanticRetryNote(userProfile, offendingTerm) {
+	const dietType = userProfile?.foodPreferences?.dietType;
+	const allergies = Array.isArray(userProfile?.foodPreferences?.allergies)
+		? userProfile.foodPreferences.allergies.filter((item) => String(item ?? "").trim())
+		: [];
+	const forbiddenFoods = Array.isArray(userProfile?.foodPreferences?.forbiddenFoods)
+		? userProfile.foodPreferences.forbiddenFoods.filter((item) => String(item ?? "").trim())
+		: [];
+	const healthConditions = Array.isArray(userProfile?.healthConditions)
+		? userProfile.healthConditions.filter((item) => item && item !== "none")
+		: [];
+	const lines = [
+		"=== تصحيح إلزامي — أعد توليد الخطة كاملة ===",
+		`المحاولة السابقة رُفضت لأنها احتوت على مكوّن محظور: "${offendingTerm}".`,
+	];
+	if (dietType === "vegan") {
+		lines.push("هذا المستخدم نباتي صرف (vegan): يُمنع منعاً باتاً أي لحم أو دواجن أو سمك أو ألبان أو بيض — استخدم بدائل نباتية فقط.");
+	} else if (dietType === "vegetarian") {
+		lines.push("هذا المستخدم نباتي (vegetarian): يُمنع منعاً باتاً أي لحم أو دواجن أو سمك.");
+	} else if (dietType === "keto") {
+		lines.push("هذا المستخدم على حمية الكيتو: تجنب الأرز والخبز والمعكرونة والبطاطا والسكريات.");
+	}
+	if (allergies.length > 0) {
+		lines.push(`حساسية غذائية خطيرة من: ${allergies.join("، ")} — لا تستخدمها أبداً في أي وجبة.`);
+	}
+	if (forbiddenFoods.length > 0) {
+		lines.push(`أطعمة محظورة تماماً: ${forbiddenFoods.join("، ")} — لا تستخدمها تحت أي ظرف.`);
+	}
+	if (healthConditions.length > 0) {
+		lines.push(`الحالات الصحية للمستخدم: ${healthConditions.join("، ")} — راعِ قيودها الغذائية بدقة.`);
+	}
+	lines.push("أعد الآن الخطة كاملة بصيغة JSON فقط، بدون أي نص إضافي، مع الالتزام الحرفي بهذا التصحيح.");
+	return `\n${lines.join("\n")}`;
+}
+
+/**
  * Removes optional markdown code fences from a model response.
  * @param {string} text Raw model response.
  * @returns {string} Cleaned JSON candidate text.
@@ -471,12 +514,47 @@ function stripMarkdownFences(text) {
 }
 
 /**
+ * Extracts the JSON candidate from a model response that may wrap the
+ * object in prose. Returns the trimmed input unchanged when it already
+ * starts with "{"; otherwise returns the first balanced "{...}" span, or
+ * the trimmed input unchanged when no balanced span exists (so the
+ * existing parse-error path fires instead of a new behavior).
+ * @param {string} text Raw (fence-stripped) model response.
+ * @returns {string} JSON candidate text.
+ */
+export function extractJsonCandidate(text) {
+	const trimmed = String(text ?? "").trim();
+	if (!trimmed || trimmed.startsWith("{")) return trimmed;
+	const start = trimmed.indexOf("{");
+	if (start === -1) return trimmed;
+	let depth = 0;
+	let inString = false;
+	let escaped = false;
+	for (let i = start; i < trimmed.length; i++) {
+		const ch = trimmed[i];
+		if (inString) {
+			if (escaped) escaped = false;
+			else if (ch === "\\") escaped = true;
+			else if (ch === '"') inString = false;
+		} else if (ch === '"') {
+			inString = true;
+		} else if (ch === "{") {
+			depth++;
+		} else if (ch === "}") {
+			depth--;
+			if (depth === 0) return trimmed.slice(start, i + 1);
+		}
+	}
+	return trimmed;
+}
+
+/**
  * Validates that AI output is parseable JSON and conforms to the required plan contract.
  * @param {string} responseText Raw AI response text.
  * @returns {{ isValid: boolean, data: object | null, error: string | null }} Validation result.
  */
 export function validateAIResponse(responseText) {
-	const cleaned = stripMarkdownFences(responseText);
+	const cleaned = extractJsonCandidate(stripMarkdownFences(responseText));
 
 	let parsed;
 	try {

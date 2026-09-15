@@ -2,6 +2,7 @@
  * Server-side AI provider gateway. API keys must never use VITE_* variables.
  */
 import {
+	buildSemanticRetryNote,
 	buildSystemPrompt,
 	buildUserPrompt,
 	validateAIResponse,
@@ -62,9 +63,9 @@ function parseRetryAfterMs(value) {
 
 // Candidate models for this request: configured primary first, then fallbacks,
 // deduplicated so an env override matching a fallback is tried only once.
-function getCandidateModels(config) {
+export function getCandidateModels(config) {
 	const seen = new Set();
-	return [config?.model || process.env.GEMINI_MODEL || "gemini-3.5-flash", ...FALLBACK_MODELS].filter(
+	return [config?.model || process.env.GEMINI_MODEL || "gemini-2.0-flash", ...FALLBACK_MODELS].filter(
 		(model) => typeof model === "string" && model && !seen.has(model) && (seen.add(model), true),
 	);
 }
@@ -73,11 +74,11 @@ function sendError(res, statusCode, message) {
 	res.status(statusCode).json({ ok: false, error: { message, statusCode } });
 }
 
-function getProviderConfig() {
+export function getProviderConfig() {
 	return {
 		provider: "gemini",
 		apiKey: process.env.GEMINI_API_KEY,
-		model: process.env.GEMINI_MODEL ?? "gemini-3.5-flash",
+		model: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
 	};
 }
 
@@ -109,7 +110,7 @@ async function callProvider(config, systemPrompt, userPrompt) {
 		contents: [{ role: "user", parts: [{ text: userPrompt }] }],
 		generationConfig: {
 			maxOutputTokens: MAX_OUTPUT_TOKENS,
-			temperature: 0.7,
+			temperature: 0.2,
 			responseMimeType: "application/json",
 		},
 	};
@@ -260,12 +261,13 @@ export default async function handler(req, res) {
 			injected: guideText.length > 0,
 		});
 		const content = await callProvider(config, buildSystemPrompt(), buildUserPrompt(userProfile, nutritionSummary, guideText));
-		const validation = validateAIResponse(content);
+		let validation = validateAIResponse(content);
 		if (!validation.isValid || !validation.data) {
 			// Never log the full plan: length + tail are enough to distinguish
 			// a mid-JSON cutoff (truncation) from a non-JSON wrapper.
 			console.error("generate-plan validation failed", {
 				contentLength: typeof content === "string" ? content.length : 0,
+				head: String(content ?? "").slice(0, 200),
 				tail: String(content ?? "").slice(-200),
 				error: validation.error,
 			});
@@ -281,7 +283,33 @@ export default async function handler(req, res) {
 			healthConditions: userProfile?.healthConditions,
 			prohibitedTerms: resolvedTerms,
 		});
-		const semanticValidation = validatePlanAgainstProfile(validation.data, userProfile);
+		let semanticValidation = validatePlanAgainstProfile(validation.data, userProfile);
+		// Single repair attempt: regeneration is capped at ONE retry to bound
+		// quota cost. Only offending-term rejections qualify — structural
+		// failures without a term surface immediately as today.
+		if (!semanticValidation.isValid && semanticValidation.offendingTerm) {
+			console.log("generate-plan semantic retry", {
+				offendingTerm: semanticValidation.offendingTerm,
+				dietType: userProfile?.foodPreferences?.dietType,
+			});
+			const retryContent = await callProvider(
+				config,
+				buildSystemPrompt(),
+				buildUserPrompt(userProfile, nutritionSummary, guideText) +
+					buildSemanticRetryNote(userProfile, semanticValidation.offendingTerm),
+			);
+			const retryValidation = validateAIResponse(retryContent);
+			if (retryValidation.isValid) {
+				validation = retryValidation;
+				semanticValidation = validatePlanAgainstProfile(validation.data, userProfile);
+			} else {
+				console.error("generate-plan semantic retry unparseable", {
+					contentLength: typeof retryContent === "string" ? retryContent.length : 0,
+					tail: String(retryContent ?? "").slice(-200),
+					error: retryValidation.error,
+				});
+			}
+		}
 		if (!semanticValidation.isValid) {
 			console.error("generate-plan semantic rejection", {
 				error: semanticValidation.error,
