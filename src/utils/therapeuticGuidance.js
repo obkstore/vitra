@@ -215,9 +215,19 @@ export function getForbiddenTermsForProfile(userProfile) {
 	return getTherapeuticGuidance(userProfile).forbiddenTerms;
 }
 
+const PLANT_MILKS = ["حليب الشوفان", "حليب اللوز", "حليب الصويا", "حليب جوز الهند", "حليب نباتي"];
+
 export function textContainsForbiddenTerm(text, forbiddenTerms) {
-	const normalizedText = String(text ?? "").toLowerCase();
+	let normalizedText = String(text ?? "").toLowerCase();
 	const terms = toUniqueList(forbiddenTerms).map((term) => term.toLowerCase());
+
+	// Exempt recognized plant-based milks from the bare "حليب" dairy ban:
+	// strip those phrases first so "حليب الشوفان" passes while plain
+	// "حليب" or "حليب بقري" still match. Other dairy terms (جبن، لبن،
+	// زبادي) are unaffected, so "حليب الشوفان مع جبن" still fails.
+	for (const milk of PLANT_MILKS) {
+		normalizedText = normalizedText.split(milk.toLowerCase()).join(" ");
+	}
 
 	return terms.find((term) => term && normalizedText.includes(term)) ?? null;
 }

@@ -7,6 +7,7 @@ import {
 	validateAIResponse,
 	validatePlanAgainstProfile,
 } from "../src/utils/promptBuilder.js";
+import { getForbiddenTermsForProfile } from "../src/utils/therapeuticGuidance.js";
 import { authenticateRequest } from "./_lib/middleware/authMiddleware.js";
 import { getCachedPlan, hashPlanRequest, setCachedPlan, shouldPersistCache } from "./_lib/utils/planCache.js";
 
@@ -237,11 +238,20 @@ export default async function handler(req, res) {
 			return;
 		}
 
+		const resolvedTerms = getForbiddenTermsForProfile(userProfile);
+		console.log("generate-plan resolved restrictions:", {
+			dietType: userProfile?.foodPreferences?.dietType,
+			allergies: userProfile?.foodPreferences?.allergies,
+			forbiddenFoods: userProfile?.foodPreferences?.forbiddenFoods,
+			healthConditions: userProfile?.healthConditions,
+			prohibitedTerms: resolvedTerms,
+		});
 		const semanticValidation = validatePlanAgainstProfile(validation.data, userProfile);
 		if (!semanticValidation.isValid) {
 			console.error("generate-plan semantic rejection", {
 				error: semanticValidation.error,
 				offendingTerm: semanticValidation.offendingTerm,
+				dietType: userProfile?.foodPreferences?.dietType,
 			});
 			sendError(res, 502, semanticValidation.error ?? "تم رفض الخطة لمخالفتها القيود العلاجية");
 			return;

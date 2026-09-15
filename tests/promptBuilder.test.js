@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateAIResponse, validatePlanAgainstProfile } from '../src/utils/promptBuilder.js';
+import { textContainsForbiddenTerm, getForbiddenTermsForProfile } from '../src/utils/therapeuticGuidance.js';
 
 function buildValidPayload() {
   return {
@@ -90,4 +91,74 @@ test('validatePlanAgainstProfile rejects forbidden ingredients for diabetes', ()
   const result = validatePlanAgainstProfile(payload, payload.userProfile);
   assert.equal(result.isValid, false);
   assert.match(result.error, /محظور|forbidden|سكر/i);
+});
+
+function buildVeganProfile() {
+  const payload = buildValidPayload();
+  payload.userProfile.foodPreferences.dietType = 'vegan';
+  payload.userProfile.foodPreferences.allergies = [];
+  payload.userProfile.foodPreferences.forbiddenFoods = [];
+  return payload.userProfile;
+}
+
+// Base fixture uses سمك (fish) for dinner — correctly non-vegan. Sanitize the
+// whole payload to vegan-safe ingredients so milk assertions are isolated.
+function buildVeganPayload() {
+  const payload = buildValidPayload();
+  payload.userProfile = buildVeganProfile();
+  for (const meal of payload.nutritionPlan.meals) {
+    meal.ingredients = meal.ingredients.map((item) => (item === 'سمك' ? 'عدس' : item));
+    if (meal.recipe.includes('سمك')) meal.recipe = meal.recipe.replace(/سمك/g, 'عدس');
+  }
+  for (const day of payload.nutritionPlan.weeklyPlan) {
+    for (const meal of day.meals) {
+      meal.ingredients = meal.ingredients.map((item) => (item === 'سمك' ? 'عدس' : item));
+      if (meal.recipe.includes('سمك')) meal.recipe = meal.recipe.replace(/سمك/g, 'عدس');
+    }
+  }
+  return payload;
+}
+
+test('vegan profile still forbids dairy via diet rules with empty allergies', () => {
+  const terms = getForbiddenTermsForProfile(buildVeganProfile());
+  assert.ok(terms.includes('حليب'));
+});
+
+test('plant-based milks pass vegan validation', () => {
+  for (const milk of ['حليب الشوفان', 'حليب اللوز', 'حليب الصويا', 'حليب جوز الهند', 'حليب نباتي']) {
+    const payload = buildVeganPayload();
+    payload.nutritionPlan.meals[0].ingredients = [milk];
+    payload.nutritionPlan.meals[0].name = `وجبة مع ${milk}`;
+    payload.nutritionPlan.meals[0].recipe = `اخلط ${milk} مع الشوفان`;
+
+    const result = validatePlanAgainstProfile(payload, payload.userProfile);
+    assert.equal(result.isValid, true, `expected ${milk} to pass vegan validation`);
+  }
+});
+
+test('plain and bovine milk fail vegan validation', () => {
+  for (const milk of ['حليب', 'حليب بقري']) {
+    const payload = buildVeganPayload();
+    payload.nutritionPlan.meals[0].ingredients = [milk];
+
+    const result = validatePlanAgainstProfile(payload, payload.userProfile);
+    assert.equal(result.isValid, false, `expected ${milk} to fail vegan validation`);
+    assert.equal(result.offendingTerm, 'حليب');
+  }
+});
+
+test('plant milk mixed with real dairy still fails', () => {
+  const payload = buildVeganPayload();
+  payload.nutritionPlan.meals[0].ingredients = ['حليب الشوفان', 'جبن'];
+
+  const result = validatePlanAgainstProfile(payload, payload.userProfile);
+  assert.equal(result.isValid, false);
+  assert.equal(result.offendingTerm, 'جبن');
+});
+
+test('textContainsForbiddenTerm exempts plant milks but not plain milk', () => {
+  const terms = ['حليب'];
+  assert.equal(textContainsForbiddenTerm('حليب الشوفان', terms), null);
+  assert.equal(textContainsForbiddenTerm('حليب', terms), 'حليب');
+  assert.equal(textContainsForbiddenTerm('حليب بقري', terms), 'حليب');
 });

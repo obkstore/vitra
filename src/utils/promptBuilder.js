@@ -176,6 +176,8 @@ export function buildUserPrompt(userProfile, nutritionSummary) {
 		healthWarnings.push(`🚫 أطعمة محظورة تماماً: ${forbiddenFoods.join("، ")}`);
 	if (allergies.length > 0)
 		healthWarnings.push(`🚨 حساسية طعام خطيرة من: ${allergies.join("، ")}`);
+	if (userProfile.foodPreferences?.dietType === "vegan")
+		healthWarnings.push("🌱 النظام نباتي صرف — استخدم بدائل الحليب النباتية (مثل حليب الشوفان، حليب اللوز) ويُمنع منعاً باتاً استخدام منتجات الألبان الحيوانية (حليب بقري، لبن، جبن، زبادي).");
 
 	const warningsBlock = healthWarnings.length > 0
 		? `\n=== تحذيرات صحية حرجة — يجب الالتزام بها ===\n${healthWarnings.join("\n")}\n`
