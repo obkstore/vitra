@@ -13,11 +13,14 @@ import { getCachedPlan, hashPlanRequest, setCachedPlan, shouldPersistCache } fro
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const MAX_OUTPUT_TOKENS = 4000;
 const MAX_BODY_BYTES = 64 * 1024;
-// Fail fast per attempt: each upstream call gets a fresh AbortController, so a
+// Per-attempt budget: each upstream call gets a fresh AbortController, so a
 // slow attempt never steals time from the next retry. AbortError → 504 below.
-const UPSTREAM_TIMEOUT_MS = 15_000;
-// Transient upstream failures (overloaded / internal) are retried once after
-// a short backoff before surfacing to the caller.
+// Kept generous (45s) because a full 7-day structured plan (up to 4000 output
+// tokens) can legitimately take tens of seconds under load — a tight budget
+// aborts requests that would have succeeded.
+const UPSTREAM_TIMEOUT_MS = 45_000;
+// Transient upstream failures (overloaded / internal) fall through to the next
+// candidate model after a short backoff before surfacing to the caller.
 const RETRY_DELAY_MS = 1000;
 const RETRYABLE_UPSTREAM_STATUSES = [500, 503];
 // Ordered fallback chain: primary first, then cheaper lite models that are
@@ -88,6 +91,7 @@ async function callProvider(config, systemPrompt, userPrompt) {
 		const url = `${GEMINI_API_URL}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
 		const controller = new AbortController();
 		const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+		const startedAt = Date.now();
 		try {
 			const upstream = await fetch(url, {
 				method: "POST",
@@ -102,6 +106,7 @@ async function callProvider(config, systemPrompt, userPrompt) {
 					attempt,
 					model,
 					status: upstream.status,
+					elapsedMs: Date.now() - startedAt,
 					error: data?.error ?? data,
 				});
 				if (RETRYABLE_UPSTREAM_STATUSES.includes(upstream.status) && attempt < models.length) {
@@ -121,6 +126,11 @@ async function callProvider(config, systemPrompt, userPrompt) {
 				throw error;
 			}
 
+			console.log("generate-plan upstream success", {
+				attempt,
+				model,
+				elapsedMs: Date.now() - startedAt,
+			});
 			return content;
 		} catch (err) {
 			// Intentional provider errors already carry statusCode — pass through untouched.
@@ -130,6 +140,7 @@ async function callProvider(config, systemPrompt, userPrompt) {
 				attempt,
 				model,
 				status: err?.statusCode,
+				elapsedMs: Date.now() - startedAt,
 				error: err?.message ?? err,
 			});
 			if (attempt < models.length) {
