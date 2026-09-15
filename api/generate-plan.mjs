@@ -41,7 +41,14 @@ const RETRYABLE_UPSTREAM_STATUSES = [429, 500, 503];
 const MAX_RETRY_AFTER_MS = 15_000;
 // Ordered fallback chain: primary first, then cheaper lite models that are
 // less likely to be saturated during demand spikes.
-const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-3.1-flash-lite"];
+// Provenance (Sep 2026): gemini-3.5-flash-lite has a CONFIRMED successful
+// generation in Railway logs; gemini-3.6-flash is Google's stated replacement
+// for the deprecated gemini-2.0-flash. The 2.5 family is deliberately avoided
+// (2.5-flash-lite was cut off for this account; 2.5-flash risks the same).
+// If a model starts 404ing, re-check availability via ListModels:
+// GET https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY
+// and re-pin primary + fallbacks to names actually returned for this key.
+const FALLBACK_MODELS = ["gemini-3.6-flash", "gemini-3.1-flash-lite"];
 
 function sleep(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -65,7 +72,7 @@ function parseRetryAfterMs(value) {
 // deduplicated so an env override matching a fallback is tried only once.
 export function getCandidateModels(config) {
 	const seen = new Set();
-	return [config?.model || process.env.GEMINI_MODEL || "gemini-2.5-flash-lite", ...FALLBACK_MODELS].filter(
+	return [config?.model || process.env.GEMINI_MODEL || "gemini-3.5-flash-lite", ...FALLBACK_MODELS].filter(
 		(model) => typeof model === "string" && model && !seen.has(model) && (seen.add(model), true),
 	);
 }
@@ -78,7 +85,7 @@ export function getProviderConfig() {
 	return {
 		provider: "gemini",
 		apiKey: process.env.GEMINI_API_KEY,
-		model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash-lite",
+		model: process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite",
 	};
 }
 
