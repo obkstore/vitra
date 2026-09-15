@@ -16,6 +16,14 @@ const MAX_BODY_BYTES = 64 * 1024;
 // Fail fast: a stalled upstream call aborts here instead of hanging until
 // the platform kills the request. AbortError maps to 504 in the catch below.
 const UPSTREAM_TIMEOUT_MS = 20_000;
+// Transient upstream failures (overloaded / internal) are retried once after
+// a short backoff before surfacing to the caller.
+const RETRY_DELAY_MS = 1000;
+const RETRYABLE_UPSTREAM_STATUSES = [500, 503];
+
+function sleep(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function sendError(res, statusCode, message) {
 	res.status(statusCode).json({ ok: false, error: { message, statusCode } });
@@ -25,7 +33,7 @@ function getProviderConfig() {
 	return {
 		provider: "gemini",
 		apiKey: process.env.GEMINI_API_KEY,
-		model: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
+		model: process.env.GEMINI_MODEL ?? "gemini-3.5-flash",
 	};
 }
 
@@ -67,28 +75,40 @@ async function callProvider(config, systemPrompt, userPrompt) {
 			},
 		};
 
-		const upstream = await fetch(url, {
-			method: "POST",
-			headers,
-			body: JSON.stringify(requestBody),
-			signal: controller.signal,
-		});
-		const data = await upstream.json();
+		for (let attempt = 1; attempt <= 2; attempt++) {
+			const upstream = await fetch(url, {
+				method: "POST",
+				headers,
+				body: JSON.stringify(requestBody),
+				signal: controller.signal,
+			});
+			const data = await upstream.json();
 
-		if (!upstream.ok) {
-			const error = new Error("خطأ من مزود الذكاء الاصطناعي");
-			error.statusCode = upstream.status;
-			throw error;
+			if (!upstream.ok) {
+				console.error("generate-plan upstream error", {
+					attempt,
+					status: upstream.status,
+					error: data?.error ?? data,
+				});
+				if (RETRYABLE_UPSTREAM_STATUSES.includes(upstream.status) && attempt === 1) {
+					console.log("generate-plan retrying upstream request", { attempt: 2 });
+					await sleep(RETRY_DELAY_MS);
+					continue;
+				}
+				const error = new Error("خطأ من مزود الذكاء الاصطناعي");
+				error.statusCode = upstream.status;
+				throw error;
+			}
+
+			const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+			if (typeof content !== "string" || !content.trim()) {
+				const error = new Error("استجابة فارغة من مزود الذكاء الاصطناعي");
+				error.statusCode = 502;
+				throw error;
+			}
+
+			return content;
 		}
-
-		const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-		if (typeof content !== "string" || !content.trim()) {
-			const error = new Error("استجابة فارغة من مزود الذكاء الاصطناعي");
-			error.statusCode = 502;
-			throw error;
-		}
-
-		return content;
 	} finally {
 		clearTimeout(timeout);
 	}
