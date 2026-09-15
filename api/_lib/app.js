@@ -46,7 +46,9 @@ const generateLimiter = rateLimit({
   max: 10,
   standardHeaders: "draft-8",
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req.ip),
+  // Honestly per-IP: this limiter precedes auth, so req.user is never
+  // attached here (a req.user?.id key would silently be undefined for all).
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
   message: { ok: false, error: "Too many generations — try again in a minute" },
 });
 

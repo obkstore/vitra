@@ -26,16 +26,38 @@ const MAX_BODY_BYTES = 64 * 1024;
 // tokens) can legitimately take tens of seconds under load — a tight budget
 // aborts requests that would have succeeded.
 const UPSTREAM_TIMEOUT_MS = 45_000;
-// Transient upstream failures (overloaded / internal) fall through to the next
-// candidate model after a short backoff before surfacing to the caller.
+// Transient upstream failures (rate-limited / overloaded / internal) fall
+// through to the next candidate model after a backoff before surfacing to
+// the caller. 429 honors the provider's Retry-After (capped so serverless
+// functions are never held past their own timeout); other statuses use a
+// flat backoff. Lite fallbacks carry roomier quota, so moving down the
+// chain after waiting is the best shot at surviving a burst.
 const RETRY_DELAY_MS = 1000;
-const RETRYABLE_UPSTREAM_STATUSES = [500, 503];
+const RETRYABLE_UPSTREAM_STATUSES = [429, 500, 503];
+// Longest we will ever sleep for a 429 Retry-After: serverless platforms
+// kill long-lived invocations, so waiting out a 60s quota window inside one
+// request is worse than failing fast with a 429 the client can retry.
+const MAX_RETRY_AFTER_MS = 15_000;
 // Ordered fallback chain: primary first, then cheaper lite models that are
 // less likely to be saturated during demand spikes.
 const FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
 
 function sleep(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Parses a Retry-After header (delay-seconds or HTTP date) into milliseconds.
+ * @param {unknown} value Raw header value.
+ * @returns {number | null} Wait time in ms, or null when absent/unparseable.
+ */
+function parseRetryAfterMs(value) {
+	if (value == null || value === "") return null;
+	const seconds = Number(value);
+	if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+	const dateMs = Date.parse(String(value));
+	if (!Number.isNaN(dateMs)) return Math.max(dateMs - Date.now(), 0);
+	return null;
 }
 
 // Candidate models for this request: configured primary first, then fallbacks,
@@ -117,8 +139,12 @@ async function callProvider(config, systemPrompt, userPrompt) {
 					error: data?.error ?? data,
 				});
 				if (RETRYABLE_UPSTREAM_STATUSES.includes(upstream.status) && attempt < models.length) {
-					console.log("generate-plan retrying with fallback model", { attempt: attempt + 1, model: models[attempt] });
-					await sleep(RETRY_DELAY_MS);
+					const backoffMs = upstream.status === 429
+						? (parseRetryAfterMs(upstream.headers?.get?.("retry-after")) ?? RETRY_DELAY_MS * attempt)
+						: RETRY_DELAY_MS;
+					const waitMs = Math.min(Math.max(backoffMs, RETRY_DELAY_MS), MAX_RETRY_AFTER_MS);
+					console.log("generate-plan retrying with fallback model", { attempt: attempt + 1, model: models[attempt], status: upstream.status, waitMs });
+					await sleep(waitMs);
 					continue;
 				}
 				const error = new Error("خطأ من مزود الذكاء الاصطناعي");
