@@ -121,7 +121,7 @@ export default function MealCard({ meal, mealType, isExpanded, className }) {
           </span>
 
           <div className="min-w-0">
-            <h3 className="text-base font-bold text-slate-800 truncate">{meal?.name}</h3>
+            <h3 className="text-base font-bold text-slate-800 min-w-0 flex-1 break-words leading-relaxed">{meal?.name}</h3>
             <p className="text-sm font-medium text-slate-600">{config.labelAr}</p>
             <p className="mt-1 text-xs text-slate-500 inline-flex items-center gap-1.5">
               <Clock3 className="h-3.5 w-3.5" />

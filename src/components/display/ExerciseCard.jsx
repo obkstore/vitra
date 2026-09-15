@@ -61,7 +61,7 @@ export default function ExerciseCard({ exercise, index, className }) {
           <span className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold text-sm flex items-center justify-center flex-shrink-0">
             {displayIndex}
           </span>
-          <h4 className="font-bold text-slate-800 truncate">{exercise?.name}</h4>
+          <h4 className="font-bold text-slate-800 min-w-0 flex-1 break-words leading-relaxed">{exercise?.name}</h4>
         </div>
 
         <span
