@@ -139,9 +139,11 @@ function formatListOrFallback(values, fallback) {
  * 	macros: { proteinGrams: number, carbsGrams: number, fatGrams: number },
  * 	hydration: number
  * }} nutritionSummary Nutrition summary from formatNutritionSummary.
+ * @param {string} [guideText] Optional therapeutic guide body (server-loaded
+ * .md). Empty string omits the guide section without affecting the rest.
  * @returns {string} Structured user prompt for AI plan generation.
  */
-export function buildUserPrompt(userProfile, nutritionSummary) {
+export function buildUserPrompt(userProfile, nutritionSummary, guideText = "") {
 	const genderAr = userProfile.gender === "male" ? "ذكر" : "أنثى";
 	const goalAr = getGoalAr(userProfile.goal);
 	const healthConditionsAr = formatHealthConditionsAr(userProfile.healthConditions);
@@ -377,6 +379,13 @@ export function buildUserPrompt(userProfile, nutritionSummary) {
 	return [
 		warningsBlock,
 		therapeuticGuidance,
+		String(guideText ?? "").trim()
+			? [
+					"=== دليل الأنظمة الغذائية العلاجية المعتمد (قواعد صارمة واجبة الاتباع) ===",
+					"You must strictly follow the therapeutic rules, restrictions, and food choices detailed in this guide for the user's specific health condition and diet type.",
+					String(guideText).trim(),
+				].join("\n")
+			: "",
 		"",
 		profileSection,
 		"",

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateAIResponse, validatePlanAgainstProfile } from '../src/utils/promptBuilder.js';
+import { validateAIResponse, validatePlanAgainstProfile, buildUserPrompt } from '../src/utils/promptBuilder.js';
 import { textContainsForbiddenTerm, getForbiddenTermsForProfile } from '../src/utils/therapeuticGuidance.js';
 
 function buildValidPayload() {
@@ -161,4 +161,41 @@ test('textContainsForbiddenTerm exempts plant milks but not plain milk', () => {
   assert.equal(textContainsForbiddenTerm('حليب الشوفان', terms), null);
   assert.equal(textContainsForbiddenTerm('حليب', terms), 'حليب');
   assert.equal(textContainsForbiddenTerm('حليب بقري', terms), 'حليب');
+});
+
+function buildPromptFixtures() {
+  const payload = buildValidPayload();
+  const nutritionSummary = {
+    bmi: { value: 22.5, categoryAr: 'طبيعي' },
+    dailyCalories: 2000,
+    macros: { proteinGrams: 140, carbsGrams: 220, fatGrams: 60 },
+    hydration: 2.5,
+  };
+  return { userProfile: payload.userProfile, nutritionSummary };
+}
+
+test('buildUserPrompt injects therapeutic guide section when guide text supplied', () => {
+  const { userProfile, nutritionSummary } = buildPromptFixtures();
+  const prompt = buildUserPrompt(userProfile, nutritionSummary, 'قاعدة تجريبية: Low-FODMAP مؤقت');
+
+  assert.ok(prompt.includes('=== دليل الأنظمة الغذائية العلاجية المعتمد (قواعد صارمة واجبة الاتباع) ==='));
+  assert.ok(prompt.includes('You must strictly follow the therapeutic rules'));
+  assert.ok(prompt.includes('قاعدة تجريبية: Low-FODMAP مؤقت'));
+});
+
+test('buildUserPrompt omits guide section when guide text is empty', () => {
+  const { userProfile, nutritionSummary } = buildPromptFixtures();
+
+  for (const empty of ['', '   ', undefined]) {
+    const prompt = buildUserPrompt(userProfile, nutritionSummary, empty);
+    assert.equal(prompt.includes('دليل الأنظمة الغذائية العلاجية المعتمد'), false);
+  }
+});
+
+test('buildUserPrompt stays backward compatible without guide argument', () => {
+  const { userProfile, nutritionSummary } = buildPromptFixtures();
+  const prompt = buildUserPrompt(userProfile, nutritionSummary);
+
+  assert.equal(prompt.includes('دليل الأنظمة الغذائية العلاجية المعتمد'), false);
+  assert.ok(prompt.includes('=== بيانات المستخدم ==='));
 });

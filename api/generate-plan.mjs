@@ -8,6 +8,7 @@ import {
 	validatePlanAgainstProfile,
 } from "../src/utils/promptBuilder.js";
 import { getForbiddenTermsForProfile } from "../src/utils/therapeuticGuidance.js";
+import { loadTherapeuticGuide } from "./_lib/utils/guideLoader.js";
 import { authenticateRequest } from "./_lib/middleware/authMiddleware.js";
 import { getCachedPlan, hashPlanRequest, setCachedPlan, shouldPersistCache } from "./_lib/utils/planCache.js";
 
@@ -224,7 +225,15 @@ export default async function handler(req, res) {
 	}
 
 	try {
-		const content = await callProvider(config, buildSystemPrompt(), buildUserPrompt(userProfile, nutritionSummary));
+		// Fail-open: a missing/unreadable guide logs a warning inside the
+		// loader and yields "" so generation proceeds on hardcoded guidance.
+		const { text: guideText, source: guideSource } = loadTherapeuticGuide();
+		console.log("generate-plan therapeutic guide", {
+			source: guideSource,
+			chars: guideText.length,
+			injected: guideText.length > 0,
+		});
+		const content = await callProvider(config, buildSystemPrompt(), buildUserPrompt(userProfile, nutritionSummary, guideText));
 		const validation = validateAIResponse(content);
 		if (!validation.isValid || !validation.data) {
 			// Never log the full plan: length + tail are enough to distinguish
