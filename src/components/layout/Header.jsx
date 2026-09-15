@@ -43,7 +43,7 @@ export default function Header() {
 
   const handleLogout = useCallback(() => {
     logout();
-    navigate('/auth');
+    navigate('/auth', { replace: true });
   }, [logout, navigate]);
 
   const handleNewPlan = useCallback(() => {
