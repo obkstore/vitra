@@ -1,6 +1,6 @@
 import "dotenv/config";
-import app from "../app.js";
-import { connectDB } from "../config/db.js";
+import app from "../_lib/app.js";
+import { connectDB } from "../_lib/config/db.js";
 
 /**
  * Vercel serverless catch-all for /api/plans/* (mine, save).

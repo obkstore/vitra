@@ -7,8 +7,8 @@ import {
 	validateAIResponse,
 	validatePlanAgainstProfile,
 } from "../src/utils/promptBuilder.js";
-import { authenticateRequest } from "./middleware/authMiddleware.js";
-import { getCachedPlan, hashPlanRequest, setCachedPlan, shouldPersistCache } from "./utils/planCache.js";
+import { authenticateRequest } from "./_lib/middleware/authMiddleware.js";
+import { getCachedPlan, hashPlanRequest, setCachedPlan, shouldPersistCache } from "./_lib/utils/planCache.js";
 
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const MAX_OUTPUT_TOKENS = 4000;

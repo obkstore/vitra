@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hashPlanRequest, shouldPersistCache, stableStringify } from '../api/utils/planCache.js';
-import PlanCache from '../api/models/PlanCache.js';
+import { hashPlanRequest, shouldPersistCache, stableStringify } from '../api/_lib/utils/planCache.js';
+import PlanCache from '../api/_lib/models/PlanCache.js';
 
 test('stableStringify ignores key order but respects values and arrays', () => {
   const a = stableStringify({ b: 1, a: { y: 2, x: 1 } });

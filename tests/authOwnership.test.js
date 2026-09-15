@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import process from 'node:process';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
-import { authenticateRequest, isOwner, requireAuth } from '../api/middleware/authMiddleware.js';
-import Plan from '../api/models/Plan.js';
+import { authenticateRequest, isOwner, requireAuth } from '../api/_lib/middleware/authMiddleware.js';
+import Plan from '../api/_lib/models/Plan.js';
 
 const TEST_SECRET = 'test-only-secret-for-ownership-tests';
 

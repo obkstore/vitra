@@ -7,7 +7,7 @@ import authRoutes from "./routes/authRoutes.js";
 import planRoutes from "./routes/planRoutes.js";
 import consultationRoutes from "./routes/consultationRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
-import generatePlanHandler from "./generate-plan.mjs"; // Adjust path if it's in another folder
+import generatePlanHandler from "../generate-plan.mjs"; // Adjust path if it's in another folder
 
 const app = express();
 

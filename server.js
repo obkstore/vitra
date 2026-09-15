@@ -5,8 +5,8 @@
 // the Express app as request handlers) instead.
 // Run locally with: npm run api
 import "dotenv/config";
-import app from "./api/app.js";
-import { connectDB } from "./api/config/db.js";
+import app from "./api/_lib/app.js";
+import { connectDB } from "./api/_lib/config/db.js";
 
 const PORT = process.env.PORT || 5000;
 

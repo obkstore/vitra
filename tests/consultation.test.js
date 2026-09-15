@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import mongoose from "mongoose";
-import User from "../api/models/User.js";
-import ConsultationRequest, { CONSULTATION_STATUSES } from "../api/models/ConsultationRequest.js";
+import User from "../api/_lib/models/User.js";
+import ConsultationRequest, { CONSULTATION_STATUSES } from "../api/_lib/models/ConsultationRequest.js";
 
 test("User role defaults to user and only allows user/admin", () => {
   const rolePath = User.schema.path("role");
