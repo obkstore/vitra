@@ -225,11 +225,27 @@ export function getForbiddenTermsForProfile(userProfile) {
 const VEGAN_REGEX =
 	/(ال)?(حليب|جبن|جبنة|لبن|زبادي|لحم|دجاج|سمك|برجر|سمن|زبدة)\s+(ال)?(نباتي|شوفان|لوز|صويا|كاجو|جوز الهند|أرز|ارز|مكسرات|الفول السوداني|فول سوداني)(ة|ية)?/g;
 
+// "الحمص" (chickpeas) contains the substring "لحم" (meat), so plain
+// includes() matching false-positives on the staple legume of vegan and
+// vegetarian diets ("الحمص", "بالحمص", "فتة الحمص"). Mask bare / definite /
+// ب-prefixed حمص before forbidden-term checks. Profile-agnostic like
+// VEGAN_REGEX below: harmless when no لحم term is in play, and it keeps the
+// sanitizer from mangling chickpea prose into garbled substitutions.
+const HUMMUS_REGEX = /(ال)?(ب)?حمص/g;
+
 export function textContainsForbiddenTerm(text, forbiddenTerms) {
 	let normalizedText = String(text ?? "").toLowerCase();
 	const terms = toUniqueList(forbiddenTerms).map((term) => term.toLowerCase());
 
 	normalizedText = normalizedText.replace(VEGAN_REGEX, " ");
+	// Skip the chickpea mask when حمص itself is forbidden (allergy): the
+	// mask must never hide a genuine allergen, only the لحم false positive.
+	// (One direction only: testing "الحمص".includes(term) would re-trigger
+	// the very لحم-substring trap this mask exists to fix.)
+	const hummusIsForbidden = terms.some((term) => term && term.includes("حمص"));
+	if (!hummusIsForbidden) {
+		normalizedText = normalizedText.replace(HUMMUS_REGEX, " ");
+	}
 
 	return terms.find((term) => term && normalizedText.includes(term)) ?? null;
 }

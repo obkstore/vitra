@@ -9,6 +9,8 @@ import {
 	validatePlanAgainstProfile,
 } from "../src/utils/promptBuilder.js";
 import { getForbiddenTermsForProfile } from "../src/utils/therapeuticGuidance.js";
+import { sanitizePlanForProfile } from "../src/utils/dietFallbacks.js";
+import { buildStaticFallbackPlan } from "../src/utils/staticFallbackPlans.js";
 import { loadTherapeuticGuide } from "./_lib/utils/guideLoader.js";
 import { authenticateRequest } from "./_lib/middleware/authMiddleware.js";
 import { getCachedPlan, hashPlanRequest, setCachedPlan, shouldPersistCache } from "./_lib/utils/planCache.js";
@@ -79,6 +81,46 @@ export function getCandidateModels(config) {
 
 function sendError(res, statusCode, message) {
 	res.status(statusCode).json({ ok: false, error: { message, statusCode } });
+}
+
+/**
+ * Absolute last resort: serves the pre-written static template (sanitized
+ * for this profile) as a 200 instead of any 502/429/504. Used for
+ * structural failures, surviving semantic rejections, AND provider
+ * outages (429 quota, timeout, 5xx) so the frontend UI always succeeds.
+ * Only sends a 502 itself when the template builder unexpectedly throws.
+ */
+async function serveStaticFallback(req, res, { cacheKey, userProfile, nutritionSummary, reason }) {
+	let staticPlan;
+	try {
+		staticPlan = buildStaticFallbackPlan(userProfile, nutritionSummary);
+	} catch (buildError) {
+		console.error("generate-plan static fallback build failed", {
+			reason,
+			error: buildError?.message ?? buildError,
+		});
+		sendError(res, 502, "تعذر توليد الخطة من مزود الذكاء الاصطناعي");
+		return;
+	}
+	let finalPlan = staticPlan;
+	try {
+		const { plan: sanitizedStatic } = sanitizePlanForProfile(staticPlan, userProfile);
+		if (validatePlanAgainstProfile(sanitizedStatic, userProfile).isValid) {
+			finalPlan = sanitizedStatic;
+		}
+	} catch {
+		// Template is already compliant for its diet; serve as-is.
+	}
+	console.warn("generate-plan static fallback FIRED", {
+		reason,
+		dietType: userProfile?.foodPreferences?.dietType,
+		dailyCalories: finalPlan?.nutritionPlan?.dailyCalories,
+	});
+	// Fail-open cache write (setCachedPlan never throws); guests leave no trace.
+	if (shouldPersistCache(req)) {
+		await setCachedPlan(cacheKey, finalPlan);
+	}
+	res.status(200).json({ ok: true, data: finalPlan, cached: false, fallback: "static" });
 }
 
 export function getProviderConfig() {
@@ -254,7 +296,7 @@ export default async function handler(req, res) {
 	const cacheKey = hashPlanRequest({ userProfile, nutritionSummary, model: config.model });
 	const cached = await getCachedPlan(cacheKey);
 	if (cached) {
-		res.status(200).json({ ok: true, data: cached, cached: true });
+		res.status(200).json({ ok: true, data: cached, cached: true, fallback: "none" });
 		return;
 	}
 
@@ -268,6 +310,7 @@ export default async function handler(req, res) {
 			injected: guideText.length > 0,
 		});
 		const content = await callProvider(config, buildSystemPrompt(), buildUserPrompt(userProfile, nutritionSummary, guideText));
+		let fallback = "none";
 		let validation = validateAIResponse(content);
 		if (!validation.isValid || !validation.data) {
 			// Never log the full plan: length + tail are enough to distinguish
@@ -278,7 +321,34 @@ export default async function handler(req, res) {
 				tail: String(content ?? "").slice(-200),
 				error: validation.error,
 			});
-			sendError(res, 502, validation.error ?? "استجابة غير صالحة من مزود الذكاء الاصطناعي");
+			// Single structural retry with the same prompt before falling
+			// back to the static template (bounds quota cost like the
+			// semantic retry below).
+			try {
+				const structuralRetryContent = await callProvider(
+					config,
+					buildSystemPrompt(),
+					buildUserPrompt(userProfile, nutritionSummary, guideText),
+				);
+				const structuralRetry = validateAIResponse(structuralRetryContent);
+				if (structuralRetry.isValid && structuralRetry.data) {
+					console.log("generate-plan structural retry recovered");
+					validation = structuralRetry;
+				} else {
+					console.error("generate-plan structural retry still unparseable", {
+						contentLength: typeof structuralRetryContent === "string" ? structuralRetryContent.length : 0,
+						tail: String(structuralRetryContent ?? "").slice(-200),
+						error: structuralRetry.error,
+					});
+				}
+			} catch (retryError) {
+				console.error("generate-plan structural retry call failed", {
+					message: retryError?.message ?? retryError,
+				});
+			}
+		}
+		if (!validation.isValid || !validation.data) {
+			await serveStaticFallback(req, res, { cacheKey, userProfile, nutritionSummary, reason: "structural" });
 			return;
 		}
 
@@ -292,8 +362,8 @@ export default async function handler(req, res) {
 		});
 		let semanticValidation = validatePlanAgainstProfile(validation.data, userProfile);
 		// Single repair attempt: regeneration is capped at ONE retry to bound
-		// quota cost. Only offending-term rejections qualify — structural
-		// failures without a term surface immediately as today.
+		// quota cost. Only offending-term rejections qualify — other
+		// semantic failures skip straight to auto-sanitize/static below.
 		if (!semanticValidation.isValid && semanticValidation.offendingTerm) {
 			console.log("generate-plan semantic retry", {
 				offendingTerm: semanticValidation.offendingTerm,
@@ -318,12 +388,48 @@ export default async function handler(req, res) {
 			}
 		}
 		if (!semanticValidation.isValid) {
-			console.error("generate-plan semantic rejection", {
+			// AUTO-SANITIZE (deterministic, no AI call): replace every
+			// occurrence of the forbidden terms with safe substitutes, then
+			// re-validate once. Instant and cannot fail from a bad model.
+			if (semanticValidation.offendingTerm) {
+				try {
+					const { plan: sanitizedPlan, replacedCount, replacements } = sanitizePlanForProfile(
+						validation.data,
+						userProfile,
+					);
+					const recheck = validatePlanAgainstProfile(sanitizedPlan, userProfile);
+					if (recheck.isValid) {
+						console.log("generate-plan auto-sanitize success", {
+							offendingTerm: semanticValidation.offendingTerm,
+							dietType: userProfile?.foodPreferences?.dietType,
+							replacedCount,
+							replacements,
+						});
+						validation = { isValid: true, data: sanitizedPlan, error: null };
+						semanticValidation = recheck;
+						fallback = "sanitized";
+					} else {
+						console.warn("generate-plan auto-sanitize insufficient, using static fallback", {
+							offendingTerm: semanticValidation.offendingTerm,
+							stillOffending: recheck.offendingTerm,
+							dietType: userProfile?.foodPreferences?.dietType,
+							replacedCount,
+						});
+					}
+				} catch (sanitizeError) {
+					console.error("generate-plan auto-sanitize failed", {
+						message: sanitizeError?.message ?? sanitizeError,
+					});
+				}
+			}
+		}
+		if (!semanticValidation.isValid) {
+			console.error("generate-plan semantic rejection, serving static fallback", {
 				error: semanticValidation.error,
 				offendingTerm: semanticValidation.offendingTerm,
 				dietType: userProfile?.foodPreferences?.dietType,
 			});
-			sendError(res, 502, semanticValidation.error ?? "تم رفض الخطة لمخالفتها القيود العلاجية");
+			await serveStaticFallback(req, res, { cacheKey, userProfile, nutritionSummary, reason: "semantic" });
 			return;
 		}
 
@@ -331,22 +437,24 @@ export default async function handler(req, res) {
 		if (shouldPersistCache(req)) {
 			await setCachedPlan(cacheKey, validation.data);
 		}
-		res.status(200).json({ ok: true, data: validation.data, cached: false });
+		res.status(200).json({ ok: true, data: validation.data, cached: false, fallback });
 	} catch (error) {
-		console.error("generate-plan provider call failed", {
+		// Provider outages (429 quota, timeout/AbortError, 5xx, network) are
+		// swallowed here: the scaled static template guarantees a 200 for
+		// the frontend UI regardless of what the AI provider is doing. Full
+		// error detail stays in the logs for quota/bug diagnosis.
+		if (res.headersSent) {
+			console.error("generate-plan error after response sent", {
+				message: error?.message,
+			});
+			return;
+		}
+		console.warn("generate-plan provider failed, serving static fallback", {
 			message: error?.message,
 			code: error?.code ?? error?.cause?.code,
 			name: error?.name,
 			statusCode: error?.statusCode,
 		});
-		const statusCode = error?.name === "AbortError"
-			? 504
-			: error?.statusCode === 429
-				? 429
-				: 502;
-		const message = error?.name === "AbortError"
-			? "انتهت مهلة مزود الذكاء الاصطناعي"
-			: "تعذر توليد الخطة من مزود الذكاء الاصطناعي";
-		sendError(res, statusCode, message);
+		await serveStaticFallback(req, res, { cacheKey, userProfile, nutritionSummary, reason: "provider" });
 	}
 }
