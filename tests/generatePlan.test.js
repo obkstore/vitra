@@ -13,9 +13,9 @@ function withoutEnvVar(name, fn) {
   }
 }
 
-test('getProviderConfig defaults the primary model to gemini-2.0-flash', () => {
+test('getProviderConfig defaults the primary model to gemini-2.5-flash-lite', () => {
   withoutEnvVar('GEMINI_MODEL', () => {
-    assert.equal(getProviderConfig().model, 'gemini-2.0-flash');
+    assert.equal(getProviderConfig().model, 'gemini-2.5-flash-lite');
   });
 });
 
@@ -30,22 +30,19 @@ test('getProviderConfig respects the GEMINI_MODEL override', () => {
   }
 });
 
-test('getCandidateModels leads with gemini-2.0-flash then lite fallbacks', () => {
+test('getCandidateModels leads with gemini-2.5-flash-lite then ordered fallbacks', () => {
   withoutEnvVar('GEMINI_MODEL', () => {
     const models = getCandidateModels({});
-    assert.equal(models[0], 'gemini-2.0-flash');
-    assert.ok(models.includes('gemini-3.5-flash-lite'));
-    assert.ok(models.includes('gemini-3.1-flash-lite'));
-    assert.equal(new Set(models).size, models.length);
+    assert.deepEqual(models, ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.1-flash-lite']);
   });
 });
 
 test('getCandidateModels dedupes an env override matching a fallback', () => {
   const saved = process.env.GEMINI_MODEL;
-  process.env.GEMINI_MODEL = 'gemini-3.5-flash-lite';
+  process.env.GEMINI_MODEL = 'gemini-2.5-flash';
   try {
     const models = getCandidateModels({});
-    assert.equal(models[0], 'gemini-3.5-flash-lite');
+    assert.equal(models[0], 'gemini-2.5-flash');
     assert.equal(new Set(models).size, models.length);
   } finally {
     if (saved === undefined) delete process.env.GEMINI_MODEL;

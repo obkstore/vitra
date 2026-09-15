@@ -41,7 +41,7 @@ const RETRYABLE_UPSTREAM_STATUSES = [429, 500, 503];
 const MAX_RETRY_AFTER_MS = 15_000;
 // Ordered fallback chain: primary first, then cheaper lite models that are
 // less likely to be saturated during demand spikes.
-const FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-3.1-flash-lite"];
 
 function sleep(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -65,7 +65,7 @@ function parseRetryAfterMs(value) {
 // deduplicated so an env override matching a fallback is tried only once.
 export function getCandidateModels(config) {
 	const seen = new Set();
-	return [config?.model || process.env.GEMINI_MODEL || "gemini-2.0-flash", ...FALLBACK_MODELS].filter(
+	return [config?.model || process.env.GEMINI_MODEL || "gemini-2.5-flash-lite", ...FALLBACK_MODELS].filter(
 		(model) => typeof model === "string" && model && !seen.has(model) && (seen.add(model), true),
 	);
 }
@@ -78,7 +78,7 @@ export function getProviderConfig() {
 	return {
 		provider: "gemini",
 		apiKey: process.env.GEMINI_API_KEY,
-		model: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
+		model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash-lite",
 	};
 }
 
