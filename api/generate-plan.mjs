@@ -13,16 +13,28 @@ import { getCachedPlan, hashPlanRequest, setCachedPlan, shouldPersistCache } fro
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const MAX_OUTPUT_TOKENS = 4000;
 const MAX_BODY_BYTES = 64 * 1024;
-// Fail fast: a stalled upstream call aborts here instead of hanging until
-// the platform kills the request. AbortError maps to 504 in the catch below.
-const UPSTREAM_TIMEOUT_MS = 20_000;
+// Fail fast per attempt: each upstream call gets a fresh AbortController, so a
+// slow attempt never steals time from the next retry. AbortError → 504 below.
+const UPSTREAM_TIMEOUT_MS = 15_000;
 // Transient upstream failures (overloaded / internal) are retried once after
 // a short backoff before surfacing to the caller.
 const RETRY_DELAY_MS = 1000;
 const RETRYABLE_UPSTREAM_STATUSES = [500, 503];
+// Ordered fallback chain: primary first, then cheaper lite models that are
+// less likely to be saturated during demand spikes.
+const FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
 
 function sleep(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Candidate models for this request: configured primary first, then fallbacks,
+// deduplicated so an env override matching a fallback is tried only once.
+function getCandidateModels(config) {
+	const seen = new Set();
+	return [config?.model || process.env.GEMINI_MODEL || "gemini-3.5-flash", ...FALLBACK_MODELS].filter(
+		(model) => typeof model === "string" && model && !seen.has(model) && (seen.add(model), true),
+	);
 }
 
 function sendError(res, statusCode, message) {
@@ -59,23 +71,24 @@ function isValidProfile(profile) {
 }
 
 async function callProvider(config, systemPrompt, userPrompt) {
-	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+	const headers = { "Content-Type": "application/json" };
+	const requestBody = {
+		systemInstruction: { parts: [{ text: systemPrompt }] },
+		contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+		generationConfig: {
+			maxOutputTokens: MAX_OUTPUT_TOKENS,
+			temperature: 0.7,
+			responseMimeType: "application/json",
+		},
+	};
+	const models = getCandidateModels(config);
 
-	try {
-		const url = `${GEMINI_API_URL}/${encodeURIComponent(config.model)}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
-		const headers = { "Content-Type": "application/json" };
-		const requestBody = {
-			systemInstruction: { parts: [{ text: systemPrompt }] },
-			contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-			generationConfig: {
-				maxOutputTokens: MAX_OUTPUT_TOKENS,
-				temperature: 0.7,
-				responseMimeType: "application/json",
-			},
-		};
-
-		for (let attempt = 1; attempt <= 2; attempt++) {
+	for (let attempt = 1; attempt <= models.length; attempt++) {
+		const model = models[attempt - 1];
+		const url = `${GEMINI_API_URL}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
+		const controller = new AbortController();
+		const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+		try {
 			const upstream = await fetch(url, {
 				method: "POST",
 				headers,
@@ -87,11 +100,12 @@ async function callProvider(config, systemPrompt, userPrompt) {
 			if (!upstream.ok) {
 				console.error("generate-plan upstream error", {
 					attempt,
+					model,
 					status: upstream.status,
 					error: data?.error ?? data,
 				});
-				if (RETRYABLE_UPSTREAM_STATUSES.includes(upstream.status) && attempt === 1) {
-					console.log("generate-plan retrying upstream request", { attempt: 2 });
+				if (RETRYABLE_UPSTREAM_STATUSES.includes(upstream.status) && attempt < models.length) {
+					console.log("generate-plan retrying with fallback model", { attempt: attempt + 1, model: models[attempt] });
 					await sleep(RETRY_DELAY_MS);
 					continue;
 				}
@@ -108,9 +122,27 @@ async function callProvider(config, systemPrompt, userPrompt) {
 			}
 
 			return content;
+		} catch (err) {
+			// Intentional provider errors already carry statusCode — pass through untouched.
+			if (err?.statusCode !== undefined) throw err;
+			// Timeout (AbortError), network failure, or unparsable body on this attempt.
+			console.error("generate-plan attempt failed", {
+				attempt,
+				model,
+				status: err?.statusCode,
+				error: err?.message ?? err,
+			});
+			if (attempt < models.length) {
+				console.log("generate-plan retrying with fallback model", { attempt: attempt + 1, model: models[attempt] });
+				await sleep(RETRY_DELAY_MS);
+				continue;
+			}
+			if (err?.name === "AbortError") throw err;
+			err.statusCode = 502;
+			throw err;
+		} finally {
+			clearTimeout(timeout);
 		}
-	} finally {
-		clearTimeout(timeout);
 	}
 }
 
