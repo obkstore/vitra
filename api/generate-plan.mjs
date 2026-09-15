@@ -13,7 +13,9 @@ import { getCachedPlan, hashPlanRequest, setCachedPlan, shouldPersistCache } fro
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const MAX_OUTPUT_TOKENS = 4000;
 const MAX_BODY_BYTES = 64 * 1024;
-const UPSTREAM_TIMEOUT_MS = 55_000;
+// Fail fast: a stalled upstream call aborts here instead of hanging until
+// the platform kills the request. AbortError maps to 504 in the catch below.
+const UPSTREAM_TIMEOUT_MS = 20_000;
 
 function sendError(res, statusCode, message) {
 	res.status(statusCode).json({ ok: false, error: { message, statusCode } });
@@ -93,6 +95,7 @@ async function callProvider(config, systemPrompt, userPrompt) {
 }
 
 export default async function handler(req, res) {
+	console.log("generate-plan request received", new Date().toISOString());
 	if (req.method !== "POST") {
 		sendError(res, 405, "Method not allowed");
 		return;
@@ -165,6 +168,12 @@ export default async function handler(req, res) {
 		}
 		res.status(200).json({ ok: true, data: validation.data, cached: false });
 	} catch (error) {
+		console.error("generate-plan provider call failed", {
+			message: error?.message,
+			code: error?.code ?? error?.cause?.code,
+			name: error?.name,
+			statusCode: error?.statusCode,
+		});
 		const statusCode = error?.name === "AbortError"
 			? 504
 			: error?.statusCode === 429
