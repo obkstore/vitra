@@ -163,6 +163,97 @@ test('textContainsForbiddenTerm exempts plant milks but not plain milk', () => {
   assert.equal(textContainsForbiddenTerm('حليب بقري', terms), 'حليب');
 });
 
+function buildVegetarianProfile() {
+  const payload = buildValidPayload();
+  payload.userProfile.foodPreferences.dietType = 'vegetarian';
+  payload.userProfile.foodPreferences.allergies = [];
+  payload.userProfile.foodPreferences.forbiddenFoods = [];
+  return payload.userProfile;
+}
+
+function buildVegetarianPayload() {
+  const payload = buildValidPayload();
+  payload.userProfile = buildVegetarianProfile();
+  for (const meal of payload.nutritionPlan.meals) {
+    meal.ingredients = meal.ingredients.map((item) => (item === 'سمك' ? 'عدس' : item));
+    if (meal.recipe.includes('سمك')) meal.recipe = meal.recipe.replace(/سمك/g, 'عدس');
+  }
+  for (const day of payload.nutritionPlan.weeklyPlan) {
+    for (const meal of day.meals) {
+      meal.ingredients = meal.ingredients.map((item) => (item === 'سمك' ? 'عدس' : item));
+      if (meal.recipe.includes('سمك')) meal.recipe = meal.recipe.replace(/سمك/g, 'عدس');
+    }
+  }
+  return payload;
+}
+
+test('universal vegan alternatives pass vegan validation', () => {
+  const alternatives = [
+    'جبن نباتي',
+    'لحم نباتي',
+    'زبادي الصويا',
+    'حليب الكاجو',
+    'زبدة الفول السوداني',
+    'الحليب النباتي',
+    'الجبن النباتي',
+    'دجاج الصويا',
+    'جبنة نباتية',
+  ];
+  for (const item of alternatives) {
+    const payload = buildVeganPayload();
+    payload.nutritionPlan.meals[0].ingredients = [item];
+    payload.nutritionPlan.meals[0].name = `وجبة مع ${item}`;
+    payload.nutritionPlan.meals[0].recipe = `اخلط ${item} مع الخضار`;
+
+    const result = validatePlanAgainstProfile(payload, payload.userProfile);
+    assert.equal(result.isValid, true, `expected ${item} to pass vegan validation`);
+  }
+});
+
+test('vegan alternatives pass vegetarian validation while plain meat fails', () => {
+  const passing = buildVegetarianPayload();
+  passing.nutritionPlan.meals[0].ingredients = ['لحم نباتي'];
+  passing.nutritionPlan.meals[0].name = 'وجبة مع لحم نباتي';
+  passing.nutritionPlan.meals[0].recipe = 'اخلط لحم نباتي مع الخضار';
+  assert.equal(validatePlanAgainstProfile(passing, passing.userProfile).isValid, true);
+
+  const failing = buildVegetarianPayload();
+  failing.nutritionPlan.meals[0].ingredients = ['لحم بقري'];
+  const result = validatePlanAgainstProfile(failing, failing.userProfile);
+  assert.equal(result.isValid, false);
+  assert.equal(result.offendingTerm, 'لحم');
+});
+
+test('non-plant animal terms still fail vegan validation', () => {
+  const cases = [
+    { item: 'جبن قريش', term: 'جبن' },
+    { item: 'لحم بقري', term: 'لحم' },
+    { item: 'سمن بلدي', term: 'سمن' },
+    { item: 'لبن رائب', term: 'لبن' },
+  ];
+  for (const { item, term } of cases) {
+    const payload = buildVeganPayload();
+    payload.nutritionPlan.meals[0].ingredients = [item];
+
+    const result = validatePlanAgainstProfile(payload, payload.userProfile);
+    assert.equal(result.isValid, false, `expected ${item} to fail vegan validation`);
+    assert.equal(result.offendingTerm, term);
+  }
+});
+
+test('textContainsForbiddenTerm masks any animal+plant combo', () => {
+  const dairy = ['حليب', 'جبن', 'لبن', 'زبادي'];
+  const meat = ['لحم', 'دجاج', 'سمك'];
+  for (const item of ['جبن نباتي', 'الجبن النباتي', 'زبادي الصويا', 'حليب الكاجو', 'زبدة الفول السوداني']) {
+    assert.equal(textContainsForbiddenTerm(item, dairy), null, `expected ${item} to be masked`);
+  }
+  for (const item of ['لحم نباتي', 'دجاج الصويا', 'الحليب النباتي']) {
+    assert.equal(textContainsForbiddenTerm(item, [...dairy, ...meat]) , null, `expected ${item} to be masked`);
+  }
+  assert.equal(textContainsForbiddenTerm('جبن نباتي مع حليب بقري', dairy), 'حليب');
+  assert.equal(textContainsForbiddenTerm('جبن قريش', dairy), 'جبن');
+});
+
 function buildPromptFixtures() {
   const payload = buildValidPayload();
   const nutritionSummary = {

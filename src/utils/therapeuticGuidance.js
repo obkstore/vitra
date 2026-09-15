@@ -215,19 +215,21 @@ export function getForbiddenTermsForProfile(userProfile) {
 	return getTherapeuticGuidance(userProfile).forbiddenTerms;
 }
 
-const PLANT_MILKS = ["حليب الشوفان", "حليب اللوز", "حليب الصويا", "حليب جوز الهند", "حليب نباتي"];
+// Masks ANY animal-term + plant-qualifier combo before forbidden-term checks,
+// so "جبن نباتي", "لحم نباتي", "زبادي الصويا", "حليب الكاجو" and
+// "زبدة الفول السوداني" all pass while plain "حليب", "حليب بقري" or
+// "جبن قريش" still match. The optional ال prefix/suffix groups cover
+// definite-article forms ("الحليب النباتي", "الجبن النباتي") and feminine
+// endings ("جبنة نباتية"). Masking is profile-agnostic, so it also fixes
+// vegetarian profiles ("لحم نباتي" passes where only meat/fish are banned).
+const VEGAN_REGEX =
+	/(ال)?(حليب|جبن|جبنة|لبن|زبادي|لحم|دجاج|سمك|برجر|سمن|زبدة)\s+(ال)?(نباتي|شوفان|لوز|صويا|كاجو|جوز الهند|أرز|ارز|مكسرات|الفول السوداني|فول سوداني)(ة|ية)?/g;
 
 export function textContainsForbiddenTerm(text, forbiddenTerms) {
 	let normalizedText = String(text ?? "").toLowerCase();
 	const terms = toUniqueList(forbiddenTerms).map((term) => term.toLowerCase());
 
-	// Exempt recognized plant-based milks from the bare "حليب" dairy ban:
-	// strip those phrases first so "حليب الشوفان" passes while plain
-	// "حليب" or "حليب بقري" still match. Other dairy terms (جبن، لبن،
-	// زبادي) are unaffected, so "حليب الشوفان مع جبن" still fails.
-	for (const milk of PLANT_MILKS) {
-		normalizedText = normalizedText.split(milk.toLowerCase()).join(" ");
-	}
+	normalizedText = normalizedText.replace(VEGAN_REGEX, " ");
 
 	return terms.find((term) => term && normalizedText.includes(term)) ?? null;
 }
