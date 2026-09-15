@@ -13,10 +13,10 @@ import { getCachedPlan, hashPlanRequest, setCachedPlan, shouldPersistCache } fro
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 // Sizing note (measured Sep 2026): a minimal valid plan serializes to ~17KB,
 // and Arabic-heavy JSON tokenizes at ~2-4 bytes/token, so a 4000-token cap cut
-// output mid-JSON (finishReason MAX_TOKENS) and every request failed parse
-// with a silent 502. 8000 gives ~2x headroom over the measured floor; the
-// model supports up to 65k output, so this is safely inside limits.
-const MAX_OUTPUT_TOKENS = 8000;
+// output mid-JSON at ~12,078 chars (finishReason MAX_TOKENS) and every request
+// failed parse with a silent 502. 16384 gives ~2x headroom over the measured
+// floor; the model supports up to 65k output, so this is safely inside limits.
+const MAX_OUTPUT_TOKENS = 16384;
 const MAX_BODY_BYTES = 64 * 1024;
 // Per-attempt budget: each upstream call gets a fresh AbortController, so a
 // slow attempt never steals time from the next retry. AbortError → 504 below.
@@ -125,6 +125,10 @@ async function callProvider(config, systemPrompt, userPrompt) {
 			}
 
 			const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+			const finishReason = data?.candidates?.[0]?.finishReason;
+			if (finishReason === "MAX_TOKENS") {
+				console.warn("generate-plan output truncated by MAX_TOKENS");
+			}
 			if (typeof content !== "string" || !content.trim()) {
 				const error = new Error("استجابة فارغة من مزود الذكاء الاصطناعي");
 				error.statusCode = 502;
@@ -135,7 +139,7 @@ async function callProvider(config, systemPrompt, userPrompt) {
 				attempt,
 				model,
 				elapsedMs: Date.now() - startedAt,
-				finishReason: data?.candidates?.[0]?.finishReason,
+				finishReason,
 				usage: data?.usageMetadata,
 			});
 			return content;
