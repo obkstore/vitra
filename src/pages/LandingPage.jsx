@@ -925,7 +925,7 @@ export default function LandingPage() {
                     variant="primary"
                     size="lg"
                     rightIcon={<ArrowLeft className="h-4 w-4" />}
-                    onClick={() => navigate('/onboarding')}
+                    onClick={() => navigate('/auth')}
                   >
                     ابدأ رحلتك الآن
                   </Button>
