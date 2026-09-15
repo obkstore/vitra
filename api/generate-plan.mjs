@@ -11,7 +11,12 @@ import { authenticateRequest } from "./_lib/middleware/authMiddleware.js";
 import { getCachedPlan, hashPlanRequest, setCachedPlan, shouldPersistCache } from "./_lib/utils/planCache.js";
 
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
-const MAX_OUTPUT_TOKENS = 4000;
+// Sizing note (measured Sep 2026): a minimal valid plan serializes to ~17KB,
+// and Arabic-heavy JSON tokenizes at ~2-4 bytes/token, so a 4000-token cap cut
+// output mid-JSON (finishReason MAX_TOKENS) and every request failed parse
+// with a silent 502. 8000 gives ~2x headroom over the measured floor; the
+// model supports up to 65k output, so this is safely inside limits.
+const MAX_OUTPUT_TOKENS = 8000;
 const MAX_BODY_BYTES = 64 * 1024;
 // Per-attempt budget: each upstream call gets a fresh AbortController, so a
 // slow attempt never steals time from the next retry. AbortError → 504 below.
@@ -130,6 +135,8 @@ async function callProvider(config, systemPrompt, userPrompt) {
 				attempt,
 				model,
 				elapsedMs: Date.now() - startedAt,
+				finishReason: data?.candidates?.[0]?.finishReason,
+				usage: data?.usageMetadata,
 			});
 			return content;
 		} catch (err) {
@@ -215,12 +222,23 @@ export default async function handler(req, res) {
 		const content = await callProvider(config, buildSystemPrompt(), buildUserPrompt(userProfile, nutritionSummary));
 		const validation = validateAIResponse(content);
 		if (!validation.isValid || !validation.data) {
+			// Never log the full plan: length + tail are enough to distinguish
+			// a mid-JSON cutoff (truncation) from a non-JSON wrapper.
+			console.error("generate-plan validation failed", {
+				contentLength: typeof content === "string" ? content.length : 0,
+				tail: String(content ?? "").slice(-200),
+				error: validation.error,
+			});
 			sendError(res, 502, validation.error ?? "استجابة غير صالحة من مزود الذكاء الاصطناعي");
 			return;
 		}
 
 		const semanticValidation = validatePlanAgainstProfile(validation.data, userProfile);
 		if (!semanticValidation.isValid) {
+			console.error("generate-plan semantic rejection", {
+				error: semanticValidation.error,
+				offendingTerm: semanticValidation.offendingTerm,
+			});
 			sendError(res, 502, semanticValidation.error ?? "تم رفض الخطة لمخالفتها القيود العلاجية");
 			return;
 		}
