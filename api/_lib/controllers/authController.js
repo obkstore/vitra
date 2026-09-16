@@ -5,10 +5,6 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import User from "../models/User.js";
-import crypto from "crypto";
-import jwt from "jsonwebtoken";
-import nodemailer from "nodemailer";
-import User from "../models/User.js";
 
 function signToken(user) {
   const secret = process.env.JWT_SECRET;
