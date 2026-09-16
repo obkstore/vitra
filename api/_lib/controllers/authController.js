@@ -1,9 +1,5 @@
-import dns from "node:dns";
-dns.setDefaultResultOrder("ipv4first");
-
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
-import nodemailer from "nodemailer";
 import User from "../models/User.js";
 
 function signToken(user) {
@@ -176,29 +172,27 @@ export async function forgotPassword(req, res) {
     }
     const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
-    // Send email using Nodemailer (dynamic SMTP via env, safe Gmail defaults)
-    const transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: Number(process.env.EMAIL_PORT) || 587,
-      secure: Number(process.env.EMAIL_PORT) === 465,
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-      family: 4,
-      connectionTimeout: 10000,
-      socketTimeout: 10000
+    const emailResponse = await fetch("https://smtp.maileroo.com/api/v2/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": process.env.MAILEROO_API_KEY,
+      },
+      body: JSON.stringify({
+        from: { address: process.env.EMAIL_FROM, display_name: "VITRA" },
+        to: [{ address: user.email }],
+        subject: "VITRA - Password Reset Request",
+        plain: `VITRA Password Reset\n\nYou are receiving this email because you (or someone else) has requested a password reset for your account.\n\nPlease click on the following link, or paste this into your browser to complete the process:\n\n${resetUrl}\n\nThis reset link will expire in 1 hour.\n\nIf you did not request this, please ignore this email and your password will remain unchanged.`,
+      }),
     });
 
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-      to: user.email,
-      subject: "VITRA - Password Reset Request",
-      text: `VITRA Password Reset\n\nYou are receiving this email because you (or someone else) has requested a password reset for your account.\n\nPlease click on the following link, or paste this into your browser to complete the process:\n\n${resetUrl}\n\nThis reset link will expire in 1 hour.\n\nIf you did not request this, please ignore this email and your password will remain unchanged.`,
-    };
-
-    try {
-      await transporter.sendMail(mailOptions);
-    } catch (error) {
-      console.error("Nodemailer SMTP Error:", error);
-      return res.status(500).json({ ok: false, error: `Send failed: ${error.message}` });
+    if (!emailResponse.ok) {
+      const errBody = await emailResponse.text();
+      console.error("Maileroo API error:", emailResponse.status, errBody);
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+      return res.status(500).json({ ok: false, error: "Could not send the reset email. Please try again shortly." });
     }
 
     return res.status(200).json({
