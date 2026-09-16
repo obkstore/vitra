@@ -179,16 +179,10 @@ export async function forgotPassword(req, res) {
       port: Number(process.env.EMAIL_PORT) || 587,
       secure: Number(process.env.EMAIL_PORT) === 465,
       auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+      family: 4,
       connectionTimeout: 10000,
       socketTimeout: 10000
     });
-
-    try {
-      await transporter.verify();
-    } catch (error) {
-      console.error("Nodemailer SMTP Error:", error);
-      return res.status(500).json({ ok: false, error: `SMTP verify failed: ${error.message}` });
-    }
 
     const mailOptions = {
       from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
