@@ -1,3 +1,10 @@
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
+
+import crypto from "crypto";
+import jwt from "jsonwebtoken";
+import nodemailer from "nodemailer";
+import User from "../models/User.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
